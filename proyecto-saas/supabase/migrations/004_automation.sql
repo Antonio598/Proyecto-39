@@ -1,4 +1,23 @@
--- Automation / posting rules
+-- AI prompts / templates (debe crearse primero)
+CREATE TABLE public.ai_prompts (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id  UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+  created_by    UUID REFERENCES public.users(id),
+  name          TEXT NOT NULL,
+  prompt_text   TEXT NOT NULL,
+  platform      social_platform,
+  format        post_format,
+  tone          TEXT,
+  language      TEXT DEFAULT 'es',
+  use_hashtags  BOOLEAN DEFAULT TRUE,
+  use_emojis    BOOLEAN DEFAULT TRUE,
+  is_template   BOOLEAN DEFAULT FALSE,
+  usage_count   INT DEFAULT 0,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Automation / posting rules (referencia ai_prompts, va después)
 CREATE TABLE public.posting_rules (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id      UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
@@ -16,37 +35,18 @@ CREATE TABLE public.posting_rules (
   updated_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
--- AI prompts / templates
-CREATE TABLE public.ai_prompts (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id  UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
-  created_by    UUID REFERENCES public.users(id),
-  name          TEXT NOT NULL,
-  prompt_text   TEXT NOT NULL,
-  platform      social_platform,
-  format        post_format,
-  tone          TEXT,              -- professional, casual, funny, inspirational, etc.
-  language      TEXT DEFAULT 'es',
-  use_hashtags  BOOLEAN DEFAULT TRUE,
-  use_emojis    BOOLEAN DEFAULT TRUE,
-  is_template   BOOLEAN DEFAULT FALSE,
-  usage_count   INT DEFAULT 0,
-  created_at    TIMESTAMPTZ DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- RLS
-ALTER TABLE public.posting_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_prompts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.posting_rules ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "posting_rules_workspace" ON public.posting_rules
+CREATE POLICY "ai_prompts_workspace" ON public.ai_prompts
   FOR ALL USING (
     workspace_id IN (
       SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
     )
   );
 
-CREATE POLICY "ai_prompts_workspace" ON public.ai_prompts
+CREATE POLICY "posting_rules_workspace" ON public.posting_rules
   FOR ALL USING (
     workspace_id IN (
       SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
