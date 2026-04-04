@@ -39,10 +39,10 @@ export async function POST(request: Request) {
 
     if (wsError) throw wsError;
 
-    // Add user as admin member
+    // Add user as admin member (upsert to avoid duplicate on retry)
     const { error: memberError } = await admin
       .from("workspace_members")
-      .insert({ workspace_id: workspace.id, user_id: user.id, role: "admin" });
+      .upsert({ workspace_id: workspace.id, user_id: user.id, role: "admin" }, { onConflict: "workspace_id,user_id" });
 
     if (memberError) throw memberError;
 
