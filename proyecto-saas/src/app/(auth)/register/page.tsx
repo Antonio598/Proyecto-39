@@ -22,23 +22,26 @@ export default function RegisterPage() {
     setLoading(true);
     setError("");
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName, workspace_name: workspaceName },
-        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
-      },
+    // Create user via admin API (bypasses email confirmation)
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, fullName, workspaceName }),
     });
 
-    if (signUpError) {
-      setError(signUpError.message);
+    const json = await res.json();
+
+    if (!res.ok) {
+      setError(json.error ?? "Error al crear la cuenta");
       setLoading(false);
       return;
     }
 
-    if (data.user && !data.user.email_confirmed_at) {
-      setSuccess(true);
+    // Auto sign-in after successful creation
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (signInError) {
+      setError("Cuenta creada. Inicia sesión manualmente.");
       setLoading(false);
       return;
     }
