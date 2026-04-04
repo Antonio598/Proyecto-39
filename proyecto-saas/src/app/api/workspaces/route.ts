@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { handleApiError } from "@/lib/utils/errors";
 
 export async function POST(request: Request) {
@@ -16,8 +17,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
     }
 
+    const admin = createAdminClient();
+
     // Ensure user row exists in public.users (trigger may not have run yet)
-    await supabase.from("users").upsert({
+    await admin.from("users").upsert({
       id: user.id,
       email: user.email ?? "",
       full_name: user.user_metadata?.full_name ?? null,
@@ -27,8 +30,8 @@ export async function POST(request: Request) {
     const baseSlug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 7)}`;
 
-    // Create workspace
-    const { data: workspace, error: wsError } = await supabase
+    // Create workspace (admin bypasses RLS)
+    const { data: workspace, error: wsError } = await admin
       .from("workspaces")
       .insert({ name: name.trim(), slug, created_by: user.id })
       .select()
@@ -37,7 +40,7 @@ export async function POST(request: Request) {
     if (wsError) throw wsError;
 
     // Add user as admin member
-    const { error: memberError } = await supabase
+    const { error: memberError } = await admin
       .from("workspace_members")
       .insert({ workspace_id: workspace.id, user_id: user.id, role: "admin" });
 
@@ -45,7 +48,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: workspace }, { status: 201 });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : JSON.stringify(error);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return handleApiError(error);
   }
 }
