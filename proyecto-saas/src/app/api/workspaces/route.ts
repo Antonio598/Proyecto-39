@@ -48,6 +48,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: workspace }, { status: 201 });
   } catch (error) {
-    return handleApiError(error);
+    const e = error as { message?: string; code?: string; details?: string };
+    return NextResponse.json(
+      { error: e?.message ?? "unknown", code: e?.code, details: e?.details },
+      { status: 500 }
+    );
   }
 }
