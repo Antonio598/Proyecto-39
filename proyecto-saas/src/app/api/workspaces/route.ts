@@ -45,8 +45,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: workspace }, { status: 201 });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : JSON.stringify(error);
-    console.error("[POST /api/workspaces]", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return handleApiError(error);
   }
 }
