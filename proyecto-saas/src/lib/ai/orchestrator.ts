@@ -43,7 +43,7 @@ export function buildSystemPrompt(
   language: string,
   brandContext?: string
 ): string {
-  const platformName = { instagram: "Instagram", facebook: "Facebook", youtube: "YouTube" }[platform];
+  const platformName = { instagram: "Instagram", facebook: "Facebook", youtube: "YouTube", linkedin: "LinkedIn", tiktok: "TikTok" }[platform];
   const formatName = {
     image: "imagen", carousel: "carrusel", reel: "Reel", story: "Story",
     short: "YouTube Short", long_video: "video largo", text: "publicación de texto",
