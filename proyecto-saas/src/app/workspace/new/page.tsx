@@ -15,7 +15,7 @@ export default async function NewWorkspacePage() {
 
   const existingWorkspaces = (memberships ?? [])
     .map((m) => {
-      const ws = m.workspaces as { id: string; name: string } | null;
+      const ws = m.workspaces as unknown as { id: string; name: string } | null;
       return ws ? { id: ws.id, name: ws.name, role: m.role } : null;
     })
     .filter(Boolean) as { id: string; name: string; role: string }[];
