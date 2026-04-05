@@ -25,11 +25,24 @@ export async function POST(request: Request) {
 
     const allProfiles = await getProfiles();
 
+    // Debug: return raw profiles to diagnose
+    if (allProfiles.length === 0) {
+      return NextResponse.json({ error: "Postproxy returned 0 profiles", groupId });
+    }
+
     // If groupId set, filter by it — otherwise import all Postproxy profiles
     const relevant = allProfiles.filter((p) =>
       POSTPROXY_PLATFORMS.includes(p.platform as SocialPlatform) &&
       (!groupId || p.profile_group_id === groupId)
     );
+
+    if (relevant.length === 0) {
+      return NextResponse.json({
+        error: "No matching profiles",
+        groupId,
+        allProfiles: allProfiles.map(p => ({ id: p.id, platform: p.platform, group: p.profile_group_id })),
+      });
+    }
 
     let saved = 0;
     for (const profile of relevant) {
