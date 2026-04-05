@@ -10,9 +10,22 @@ function headers() {
 
 export type PostproxyPlatform = "facebook" | "instagram" | "linkedin" | "tiktok";
 
+/** Get the first profile group ID */
+async function getProfileGroupId(): Promise<string> {
+  const res = await fetch(`${POSTPROXY_API_URL}/api/profile_groups`, {
+    headers: headers(),
+  });
+  if (!res.ok) throw new Error(`Postproxy profile_groups error ${res.status}`);
+  const json = await res.json();
+  const groups = json.data ?? json;
+  if (!groups?.length) throw new Error("No profile groups found in Postproxy account");
+  return groups[0].id;
+}
+
 /** Generate OAuth URL to connect a social account */
 export async function initializeConnection(platform: PostproxyPlatform, redirectUrl: string) {
-  const res = await fetch(`${POSTPROXY_API_URL}/api/profile_groups/initialize_connection`, {
+  const groupId = await getProfileGroupId();
+  const res = await fetch(`${POSTPROXY_API_URL}/api/profile_groups/${groupId}/initialize-connection`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ platform, redirect_url: redirectUrl }),

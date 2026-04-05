@@ -28,7 +28,6 @@ export async function GET(request: Request) {
 
     return NextResponse.redirect(url);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : JSON.stringify(error);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return handleApiError(error);
   }
 }
