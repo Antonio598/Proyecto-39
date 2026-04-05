@@ -10,8 +10,11 @@ function headers() {
 
 export type PostproxyPlatform = "facebook" | "instagram" | "linkedin" | "tiktok";
 
-/** Get the first profile group ID */
+/** Get the profile group ID — uses env var if set, otherwise first group */
 async function getProfileGroupId(): Promise<string> {
+  if (process.env.POSTPROXY_PROFILE_GROUP_ID) {
+    return process.env.POSTPROXY_PROFILE_GROUP_ID;
+  }
   const res = await fetch(`${POSTPROXY_API_URL}/api/profile_groups`, {
     headers: headers(),
   });
@@ -25,7 +28,7 @@ async function getProfileGroupId(): Promise<string> {
 /** Generate OAuth URL to connect a social account */
 export async function initializeConnection(platform: PostproxyPlatform, redirectUrl: string) {
   const groupId = await getProfileGroupId();
-  const res = await fetch(`${POSTPROXY_API_URL}/api/profile_groups/${groupId}/initialize-connection`, {
+  const res = await fetch(`${POSTPROXY_API_URL}/api/profile_groups/${groupId}/initialize_connection`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ platform, redirect_url: redirectUrl }),
