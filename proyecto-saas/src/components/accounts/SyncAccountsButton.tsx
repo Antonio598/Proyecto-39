@@ -16,11 +16,11 @@ export function SyncAccountsButton({ workspaceId }: { workspaceId: string }) {
       headers: { "x-workspace-id": workspaceId },
     });
     const json = await res.json();
-    if (res.ok) {
-      toast.success(`${json.saved}/${json.total} cuentas sincronizadas (grupo: ${json.groupId ?? "todos"})`);
+    if (res.ok && json.saved !== undefined) {
+      toast.success(`${json.saved}/${json.total} cuentas sincronizadas`);
       router.refresh();
     } else {
-      toast.error(`Error: ${json.error ?? "desconocido"}`);
+      toast.error(JSON.stringify(json).slice(0, 200));
     }
     setSyncing(false);
   }
