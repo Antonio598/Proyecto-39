@@ -17,10 +17,10 @@ export function SyncAccountsButton({ workspaceId }: { workspaceId: string }) {
     });
     const json = await res.json();
     if (res.ok) {
-      toast.success(`${json.saved} cuenta${json.saved !== 1 ? "s" : ""} sincronizada${json.saved !== 1 ? "s" : ""}`);
+      toast.success(`${json.saved}/${json.total} cuentas sincronizadas (grupo: ${json.groupId ?? "todos"})`);
       router.refresh();
     } else {
-      toast.error("Error al sincronizar");
+      toast.error(`Error: ${json.error ?? "desconocido"}`);
     }
     setSyncing(false);
   }

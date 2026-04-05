@@ -56,8 +56,9 @@ export async function POST(request: Request) {
       else console.error("[Sync] upsert error", error.message);
     }
 
-    return NextResponse.json({ saved });
+    return NextResponse.json({ saved, total: relevant.length, groupId });
   } catch (error) {
-    return handleApiError(error);
+    const msg = error instanceof Error ? error.message : JSON.stringify(error);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
