@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Plus, Link2, RefreshCw, Settings } from "lucide-react";
 import type { Metadata } from "next";
 import type { SocialPlatform } from "@/types/database";
+import { SyncAccountsButton } from "@/components/accounts/SyncAccountsButton";
 
 export const metadata: Metadata = { title: "Cuentas sociales | ContentAI" };
 
@@ -36,13 +37,16 @@ export default async function AccountsPage() {
             Gestiona las cuentas conectadas a este workspace
           </p>
         </div>
-        <Link
-          href="/accounts/connect"
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Conectar cuenta
-        </Link>
+        <div className="flex items-center gap-2">
+          <SyncAccountsButton workspaceId={workspaceId} />
+          <Link
+            href="/accounts/connect"
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Conectar cuenta
+          </Link>
+        </div>
       </div>
 
       {accounts.length === 0 ? (

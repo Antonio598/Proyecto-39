@@ -1,16 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
-import { Settings, Save, Loader2 } from "lucide-react";
+import { Settings, Save, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function WorkspaceSettingsPage() {
+  const router = useRouter();
   const { activeWorkspaceId, workspaces } = useWorkspace();
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
   const [name, setName] = useState(activeWs?.name ?? "");
   const [timezone, setTimezone] = useState(activeWs?.timezone ?? "UTC");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     setName(activeWs?.name ?? "");
@@ -21,16 +25,31 @@ export default function WorkspaceSettingsPage() {
     e.preventDefault();
     if (!activeWorkspaceId) return;
     setSaving(true);
-
     const res = await fetch(`/api/workspaces/${activeWorkspaceId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
       body: JSON.stringify({ name, timezone }),
     });
-
     if (res.ok) toast.success("Configuración guardada");
     else toast.error("Error al guardar");
     setSaving(false);
+  }
+
+  async function handleDelete() {
+    if (!activeWorkspaceId) return;
+    setDeleting(true);
+    const res = await fetch(`/api/workspaces/${activeWorkspaceId}`, {
+      method: "DELETE",
+      headers: { "x-workspace-id": activeWorkspaceId },
+    });
+    if (res.ok) {
+      toast.success("Workspace eliminado");
+      router.push("/workspace/new");
+      router.refresh();
+    } else {
+      toast.error("Error al eliminar");
+      setDeleting(false);
+    }
   }
 
   return (
@@ -78,6 +97,46 @@ export default function WorkspaceSettingsPage() {
           Guardar cambios
         </button>
       </form>
+
+      {/* Danger zone */}
+      <div className="bg-white rounded-xl border border-red-200 p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-red-700 uppercase tracking-wide">Zona de peligro</h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Eliminar workspace</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Esta acción es permanente. Se eliminarán todas las cuentas, posts y datos asociados.
+            </p>
+          </div>
+          {!confirmDelete ? (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="flex items-center gap-2 border border-red-300 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Eliminar
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-red-600 font-medium">¿Estás seguro?</span>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="px-3 py-1.5 text-sm border rounded-lg hover:bg-muted transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {deleting && <Loader2 className="w-3 h-3 animate-spin" />}
+                Confirmar
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

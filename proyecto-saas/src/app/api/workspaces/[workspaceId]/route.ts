@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/utils/errors";
 
@@ -32,6 +33,27 @@ export async function PATCH(
 
     if (error) throw error;
     return NextResponse.json({ data });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ workspaceId: string }> }
+) {
+  try {
+    const { workspaceId } = await requireWorkspaceAccess(request);
+    const { workspaceId: paramId } = await params;
+    if (paramId !== workspaceId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const admin = createAdminClient();
+    const { error } = await admin.from("workspaces").delete().eq("id", workspaceId);
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     return handleApiError(error);
   }
