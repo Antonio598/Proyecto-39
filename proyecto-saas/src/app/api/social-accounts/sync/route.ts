@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
-import { getProfiles } from "@/lib/postproxy";
+import { getProfiles, type PostproxyProfile } from "@/lib/postproxy";
 import { handleApiError } from "@/lib/utils/errors";
 import type { SocialPlatform } from "@/types/database";
 
