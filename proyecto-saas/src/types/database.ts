@@ -7,7 +7,7 @@ export type Json =
   | Json[];
 
 export type WorkspaceRole = "admin" | "editor" | "client" | "team_member";
-export type SocialPlatform = "instagram" | "facebook" | "youtube";
+export type SocialPlatform = "instagram" | "facebook" | "youtube" | "linkedin" | "tiktok";
 export type AssetType =
   | "photo"
   | "video"

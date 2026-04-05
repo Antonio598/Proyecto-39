@@ -8,29 +8,63 @@ import Link from "next/link";
 const PLATFORMS = [
   {
     id: "facebook",
-    name: "Facebook + Instagram",
-    description: "Conecta tus Facebook Pages e Instagram Business accounts. Soporta múltiples páginas y cuentas en una sola conexión.",
+    name: "Facebook",
+    description: "Conecta tus Facebook Pages para publicar posts, reels y más.",
     color: "border-blue-200 hover:border-blue-400 hover:bg-blue-50",
     iconClass: "text-blue-600",
-    features: ["Posts en páginas", "Reels de Instagram", "Stories", "Carruseles", "Métricas e insights"],
+    features: ["Posts en páginas", "Reels", "Métricas"],
+    via: "postproxy",
+  },
+  {
+    id: "instagram",
+    name: "Instagram",
+    description: "Conecta tu cuenta de Instagram Business para publicar contenido.",
+    color: "border-pink-200 hover:border-pink-400 hover:bg-pink-50",
+    iconClass: "text-pink-600",
+    features: ["Feed posts", "Reels", "Stories", "Carruseles"],
+    via: "postproxy",
+  },
+  {
+    id: "linkedin",
+    name: "LinkedIn",
+    description: "Publica en tu perfil o página de empresa de LinkedIn.",
+    color: "border-sky-200 hover:border-sky-400 hover:bg-sky-50",
+    iconClass: "text-sky-700",
+    features: ["Posts de texto", "Imágenes", "Artículos", "Páginas de empresa"],
+    via: "postproxy",
+  },
+  {
+    id: "tiktok",
+    name: "TikTok",
+    description: "Conecta tu cuenta de TikTok para publicar videos automáticamente.",
+    color: "border-gray-200 hover:border-gray-400 hover:bg-gray-50",
+    iconClass: "text-gray-900",
+    features: ["Videos", "TikTok Stories", "Programación"],
+    via: "postproxy",
   },
   {
     id: "youtube",
     name: "YouTube",
-    description: "Conecta tu canal de YouTube para publicar Shorts y videos largos automáticamente.",
+    description: "Conecta tu canal de YouTube para publicar Shorts y videos largos.",
     color: "border-red-200 hover:border-red-400 hover:bg-red-50",
     iconClass: "text-red-600",
-    features: ["YouTube Shorts", "Videos largos", "Miniaturas automáticas", "Programación de publicación"],
+    features: ["YouTube Shorts", "Videos largos", "Miniaturas automáticas"],
+    via: "google",
   },
 ];
 
 export default function ConnectAccountPage() {
   const { activeWorkspaceId } = useWorkspace();
 
-  function handleConnect(platform: string) {
+  function handleConnect(platform: string, via: string) {
     if (!activeWorkspaceId) return;
-    const endpoint = platform === "youtube" ? "/api/oauth/youtube" : "/api/oauth/facebook";
-    window.location.href = `${endpoint}?workspaceId=${activeWorkspaceId}`;
+    let endpoint = "";
+    if (via === "postproxy") {
+      endpoint = `/api/oauth/postproxy?workspaceId=${activeWorkspaceId}&platform=${platform}`;
+    } else {
+      endpoint = `/api/oauth/youtube?workspaceId=${activeWorkspaceId}`;
+    }
+    window.location.href = endpoint;
   }
 
   return (
@@ -54,12 +88,12 @@ export default function ConnectAccountPage() {
           <div
             key={platform.id}
             className={`bg-white rounded-xl border-2 p-6 cursor-pointer transition-all ${platform.color}`}
-            onClick={() => handleConnect(platform.id)}
+            onClick={() => handleConnect(platform.id, platform.via)}
           >
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-white border flex items-center justify-center flex-shrink-0 shadow-sm">
                 <PlatformIcon
-                  platform={platform.id === "facebook" ? "facebook" : "youtube"}
+                  platform={platform.id as "facebook" | "instagram" | "youtube" | "tiktok" | "linkedin"}
                   size="lg"
                   className={platform.iconClass}
                 />
