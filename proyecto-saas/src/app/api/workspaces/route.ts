@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createProfileGroup } from "@/lib/postproxy";
 import { handleApiError } from "@/lib/utils/errors";
 
 export async function POST(request: Request) {
@@ -30,10 +31,17 @@ export async function POST(request: Request) {
     const baseSlug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 7)}`;
 
+    // Create Postproxy profile group for this workspace
+    let postproxyGroupId: string | null = null;
+    try {
+      const group = await createProfileGroup(name.trim());
+      postproxyGroupId = group.id;
+    } catch { /* non-fatal — workspace still created */ }
+
     // Create workspace (admin bypasses RLS)
     const { data: workspace, error: wsError } = await admin
       .from("workspaces")
-      .insert({ name: name.trim(), slug, created_by: user.id })
+      .insert({ name: name.trim(), slug, created_by: user.id, postproxy_group_id: postproxyGroupId })
       .select()
       .single();
 

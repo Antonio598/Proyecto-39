@@ -16,17 +16,23 @@ export async function GET(request: Request) {
     const platform = searchParams.get("platform");
     const error = searchParams.get("error");
 
-    if (error) {
-      return NextResponse.redirect(`${appUrl}/accounts?error=${error}`);
-    }
+    if (error) return NextResponse.redirect(`${appUrl}/accounts?error=${error}`);
+    if (!workspaceId || !platform) return NextResponse.redirect(`${appUrl}/accounts?error=missing_params`);
 
-    if (!workspaceId || !platform) {
-      return NextResponse.redirect(`${appUrl}/accounts?error=missing_params`);
-    }
+    // Get workspace's postproxy_group_id
+    const { data: workspace } = await supabase
+      .from("workspaces")
+      .select("postproxy_group_id")
+      .eq("id", workspaceId)
+      .single();
 
-    // Fetch all profiles from Postproxy and find the ones for this platform
-    const profiles = await getProfiles();
-    const platformProfiles = profiles.filter((p) => p.platform === platform);
+    const groupId = workspace?.postproxy_group_id;
+
+    // Fetch all profiles and filter by this workspace's group + platform
+    const allProfiles = await getProfiles();
+    const platformProfiles = allProfiles.filter((p) =>
+      p.platform === platform && (!groupId || p.profile_group_id === groupId)
+    );
 
     let saved = 0;
     for (const profile of platformProfiles) {
@@ -34,10 +40,10 @@ export async function GET(request: Request) {
         workspace_id: workspaceId,
         platform: platform as "facebook" | "instagram" | "linkedin" | "tiktok",
         platform_user_id: profile.id,
-        account_name: profile.display_name ?? profile.username,
-        account_handle: profile.username ?? null,
+        account_name: profile.name,
+        account_handle: null,
         avatar_url: profile.avatar_url ?? null,
-        access_token: profile.id, // We store the Postproxy profile ID as the token
+        access_token: profile.id,
         refresh_token: null,
         token_expires_at: null,
         scopes: [],
@@ -45,14 +51,12 @@ export async function GET(request: Request) {
         auto_publish: false,
         last_synced_at: new Date().toISOString(),
         followers_count: profile.followers_count ?? 0,
-        metadata: { postproxy_profile_id: profile.id, platform },
+        metadata: { postproxy_profile_id: profile.id, postproxy_group_id: groupId },
       });
       saved++;
     }
 
-    return NextResponse.redirect(
-      `${appUrl}/accounts?success=connected&count=${saved}`
-    );
+    return NextResponse.redirect(`${appUrl}/accounts?success=connected&count=${saved}`);
   } catch (error) {
     console.error("[Postproxy Callback]", error);
     return NextResponse.redirect(`${appUrl}/accounts?error=oauth_failed`);

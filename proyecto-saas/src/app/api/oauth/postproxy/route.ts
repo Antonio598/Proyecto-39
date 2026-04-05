@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth/session";
 import { initializeConnection, type PostproxyPlatform } from "@/lib/postproxy";
 import { handleApiError } from "@/lib/utils/errors";
@@ -21,10 +22,20 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "platform not supported" }, { status: 400 });
     }
 
-    // Callback URL carries workspaceId and platform so we can save the account after OAuth
-    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/oauth/postproxy/callback?workspaceId=${workspaceId}&platform=${platform}`;
+    // Get workspace's Postproxy group ID
+    const supabase = await createClient();
+    const { data: workspace } = await supabase
+      .from("workspaces")
+      .select("postproxy_group_id")
+      .eq("id", workspaceId)
+      .single();
 
-    const { url } = await initializeConnection(platform, redirectUrl);
+    if (!workspace?.postproxy_group_id) {
+      return NextResponse.json({ error: "Workspace has no Postproxy group. Recrea el workspace." }, { status: 400 });
+    }
+
+    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/oauth/postproxy/callback?workspaceId=${workspaceId}&platform=${platform}`;
+    const { url } = await initializeConnection(platform, redirectUrl, workspace.postproxy_group_id);
 
     return NextResponse.redirect(url);
   } catch (error) {

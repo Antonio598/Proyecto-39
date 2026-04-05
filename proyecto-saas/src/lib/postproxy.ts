@@ -26,9 +26,9 @@ async function getProfileGroupId(): Promise<string> {
 }
 
 /** Generate OAuth URL to connect a social account */
-export async function initializeConnection(platform: PostproxyPlatform, redirectUrl: string) {
-  const groupId = await getProfileGroupId();
-  const res = await fetch(`${POSTPROXY_API_URL}/api/profile_groups/${groupId}/initialize_connection`, {
+export async function initializeConnection(platform: PostproxyPlatform, redirectUrl: string, groupId?: string) {
+  const resolvedGroupId = groupId ?? await getProfileGroupId();
+  const res = await fetch(`${POSTPROXY_API_URL}/api/profile_groups/${resolvedGroupId}/initialize_connection`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ platform, redirect_url: redirectUrl }),
@@ -42,8 +42,18 @@ export async function initializeConnection(platform: PostproxyPlatform, redirect
   return res.json() as Promise<{ url: string; state: string }>;
 }
 
+export interface PostproxyProfile {
+  id: string;
+  name: string;
+  platform: string;
+  status: string;
+  profile_group_id: string;
+  avatar_url?: string;
+  followers_count?: number;
+}
+
 /** Get all connected profiles */
-export async function getProfiles() {
+export async function getProfiles(): Promise<PostproxyProfile[]> {
   const res = await fetch(`${POSTPROXY_API_URL}/api/profiles`, {
     headers: headers(),
   });
@@ -51,14 +61,23 @@ export async function getProfiles() {
   if (!res.ok) throw new Error(`Postproxy profiles error ${res.status}`);
 
   const json = await res.json();
-  return (json.data ?? json) as Array<{
-    id: string;
-    platform: string;
-    username: string;
-    display_name: string;
-    avatar_url?: string;
-    followers_count?: number;
-  }>;
+  return json.data ?? json;
+}
+
+/** Create a new profile group */
+export async function createProfileGroup(name: string): Promise<{ id: string; name: string }> {
+  const res = await fetch(`${POSTPROXY_API_URL}/api/profile_groups`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ name }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.message ?? `Postproxy create group error ${res.status}`);
+  }
+
+  return res.json();
 }
 
 /** Publish a post via Postproxy */

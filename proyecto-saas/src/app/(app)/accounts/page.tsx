@@ -3,12 +3,15 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { listSocialAccounts } from "@/lib/supabase/queries/social-accounts";
 import { PlatformIcon } from "@/components/accounts/PlatformIcon";
-import { PLATFORM_LABELS, STATUS_COLORS } from "@/lib/utils/platform";
+import { PLATFORM_LABELS, PLATFORM_BG_COLORS } from "@/lib/utils/platform";
 import Link from "next/link";
-import { Plus, Link2, RefreshCw, Settings, ToggleLeft } from "lucide-react";
+import { Plus, Link2, RefreshCw, Settings } from "lucide-react";
 import type { Metadata } from "next";
+import type { SocialPlatform } from "@/types/database";
 
 export const metadata: Metadata = { title: "Cuentas sociales | ContentAI" };
+
+const ALL_PLATFORMS: SocialPlatform[] = ["facebook", "instagram", "linkedin", "tiktok", "youtube"];
 
 export default async function AccountsPage() {
   const supabase = await createClient();
@@ -30,7 +33,7 @@ export default async function AccountsPage() {
             Cuentas sociales
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Gestiona las cuentas de Instagram, Facebook y YouTube conectadas
+            Gestiona las cuentas conectadas a este workspace
           </p>
         </div>
         <Link
@@ -47,7 +50,7 @@ export default async function AccountsPage() {
           <Link2 className="w-14 h-14 text-muted-foreground/20 mx-auto mb-4" />
           <h3 className="font-semibold text-lg mb-2">No hay cuentas conectadas</h3>
           <p className="text-muted-foreground text-sm mb-6 max-w-md mx-auto">
-            Conecta tus cuentas de Instagram, Facebook y YouTube para empezar a publicar contenido automáticamente.
+            Conecta tus cuentas de redes sociales para empezar a publicar contenido automáticamente.
           </p>
           <Link
             href="/accounts/connect"
@@ -59,22 +62,15 @@ export default async function AccountsPage() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {["instagram", "facebook", "youtube"].map((platform) => {
+          {ALL_PLATFORMS.map((platform) => {
             const platformAccounts = accounts.filter((a) => a.platform === platform);
             if (platformAccounts.length === 0) return null;
 
             return (
               <div key={platform} className="bg-white rounded-xl border p-5">
                 <div className="flex items-center gap-2 mb-4">
-                  <PlatformIcon
-                    platform={platform as "instagram" | "facebook" | "youtube"}
-                    size="md"
-                    className={
-                      platform === "instagram" ? "text-pink-600" :
-                      platform === "facebook" ? "text-blue-600" : "text-red-600"
-                    }
-                  />
-                  <h3 className="font-semibold">{PLATFORM_LABELS[platform as "instagram" | "facebook" | "youtube"]}</h3>
+                  <PlatformIcon platform={platform} size="md" />
+                  <h3 className="font-semibold">{PLATFORM_LABELS[platform]}</h3>
                   <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
                     {platformAccounts.length} cuenta{platformAccounts.length > 1 ? "s" : ""}
                   </span>
@@ -101,16 +97,12 @@ export default async function AccountsPage() {
                         <p className="font-medium text-sm">{account.account_name}</p>
                         <p className="text-xs text-muted-foreground">
                           {account.account_handle ? `@${account.account_handle} · ` : ""}
-                          {account.followers_count.toLocaleString()} seguidores
+                          {account.followers_count?.toLocaleString() ?? 0} seguidores
                         </p>
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          account.is_active
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${PLATFORM_BG_COLORS[platform]}`}>
                           {account.is_active ? "Activa" : "Inactiva"}
                         </span>
                         {account.auto_publish && (
@@ -134,6 +126,17 @@ export default async function AccountsPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Reconnect button */}
+                <div className="mt-3 pt-3 border-t">
+                  <Link
+                    href={`/accounts/connect`}
+                    className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Reconectar o agregar otra cuenta
+                  </Link>
                 </div>
               </div>
             );
