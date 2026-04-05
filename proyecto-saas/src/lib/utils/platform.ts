@@ -4,18 +4,24 @@ export const PLATFORM_LABELS: Record<SocialPlatform, string> = {
   instagram: "Instagram",
   facebook: "Facebook",
   youtube: "YouTube",
+  linkedin: "LinkedIn",
+  tiktok: "TikTok",
 };
 
 export const PLATFORM_COLORS: Record<SocialPlatform, string> = {
   instagram: "#E1306C",
   facebook: "#1877F2",
   youtube: "#FF0000",
+  linkedin: "#0A66C2",
+  tiktok: "#000000",
 };
 
 export const PLATFORM_BG_COLORS: Record<SocialPlatform, string> = {
   instagram: "bg-pink-50 text-pink-700 border-pink-200",
   facebook: "bg-blue-50 text-blue-700 border-blue-200",
   youtube: "bg-red-50 text-red-700 border-red-200",
+  linkedin: "bg-sky-50 text-sky-700 border-sky-200",
+  tiktok: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
 export const FORMAT_LABELS: Record<PostFormat, string> = {
@@ -42,6 +48,8 @@ export const PLATFORM_FORMATS: Record<SocialPlatform, PostFormat[]> = {
   instagram: ["image", "carousel", "reel", "story"],
   facebook: ["image", "carousel", "text", "reel"],
   youtube: ["short", "long_video"],
+  linkedin: ["image", "text", "carousel"],
+  tiktok: ["reel", "short"],
 };
 
 export const STATUS_LABELS: Record<string, string> = {
