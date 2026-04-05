@@ -5,7 +5,7 @@ import { listSocialAccounts } from "@/lib/supabase/queries/social-accounts";
 import { PlatformIcon } from "@/components/accounts/PlatformIcon";
 import { PLATFORM_LABELS, PLATFORM_BG_COLORS } from "@/lib/utils/platform";
 import Link from "next/link";
-import { Plus, Link2, RefreshCw, Settings } from "lucide-react";
+import { Plus, Link2, Settings } from "lucide-react";
 import type { Metadata } from "next";
 import type { SocialPlatform } from "@/types/database";
 import { SyncAccountsButton } from "@/components/accounts/SyncAccountsButton";
@@ -117,9 +117,6 @@ export default async function AccountsPage() {
                       </div>
 
                       <div className="flex items-center gap-1">
-                        <button className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Sincronizar">
-                          <RefreshCw className="w-4 h-4" />
-                        </button>
                         <Link
                           href={`/accounts/${account.id}/settings`}
                           className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
