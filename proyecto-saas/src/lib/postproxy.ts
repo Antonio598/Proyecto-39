@@ -52,16 +52,16 @@ export interface PostproxyProfile {
   followers_count?: number;
 }
 
-/** Get all connected profiles */
-export async function getProfiles(): Promise<PostproxyProfile[]> {
-  const res = await fetch(`${POSTPROXY_API_URL}/api/profiles`, {
-    headers: headers(),
-  });
+/** Get connected profiles, optionally filtered by profile group */
+export async function getProfiles(profileGroupId?: string): Promise<PostproxyProfile[]> {
+  const url = new URL(`${POSTPROXY_API_URL}/api/profiles`);
+  if (profileGroupId) url.searchParams.set("profile_group_id", profileGroupId);
 
+  const res = await fetch(url.toString(), { headers: headers() });
   if (!res.ok) throw new Error(`Postproxy profiles error ${res.status}`);
 
   const json = await res.json();
-  return json.data ?? json;
+  return json.data ?? [];
 }
 
 /** Create a new profile group */

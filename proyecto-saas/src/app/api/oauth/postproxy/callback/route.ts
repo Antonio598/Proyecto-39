@@ -28,11 +28,9 @@ export async function GET(request: Request) {
 
     const groupId = workspace?.postproxy_group_id;
 
-    // Fetch all profiles and filter by this workspace's group + platform
-    const allProfiles = await getProfiles();
-    const platformProfiles = allProfiles.filter((p) =>
-      p.platform === platform && (!groupId || p.profile_group_id === groupId)
-    );
+    // Fetch profiles for this workspace's group
+    const allProfiles = await getProfiles(groupId ?? undefined);
+    const platformProfiles = allProfiles.filter((p) => p.platform === platform);
 
     let saved = 0;
     for (const profile of platformProfiles) {

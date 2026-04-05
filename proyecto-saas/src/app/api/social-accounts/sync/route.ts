@@ -23,31 +23,26 @@ export async function POST(request: Request) {
 
     const groupId = (workspace as { postproxy_group_id?: string } | null)?.postproxy_group_id ?? null;
 
-    const allProfiles = await getProfiles();
-
-    // Debug: return raw profiles to diagnose
-    if (allProfiles.length === 0) {
-      // Try raw fetch to see actual response
-      const raw = await fetch("https://api.postproxy.dev/api/profiles", {
-        headers: { "Authorization": `Bearer ${process.env.POSTPROXY_API_KEY}`, "Content-Type": "application/json" },
+    // Fetch profiles — pass groupId if available, otherwise fetch from all groups
+    let allProfiles: PostproxyProfile[] = [];
+    if (groupId) {
+      allProfiles = await getProfiles(groupId);
+    } else {
+      // No group assigned — fetch from all profile groups
+      const groupsRes = await fetch("https://api.postproxy.dev/api/profile_groups", {
+        headers: { "Authorization": `Bearer ${process.env.POSTPROXY_API_KEY}` },
       });
-      const rawJson = await raw.json().catch(() => "parse error");
-      return NextResponse.json({ error: "0 profiles", rawStatus: raw.status, rawJson, keySet: !!process.env.POSTPROXY_API_KEY });
+      const groupsJson = await groupsRes.json();
+      const groups: Array<{ id: string }> = groupsJson.data ?? [];
+      for (const g of groups) {
+        const profiles = await getProfiles(g.id);
+        allProfiles.push(...profiles);
+      }
     }
 
-    // If groupId set, filter by it — otherwise import all Postproxy profiles
     const relevant = allProfiles.filter((p) =>
-      POSTPROXY_PLATFORMS.includes(p.platform as SocialPlatform) &&
-      (!groupId || p.profile_group_id === groupId)
+      POSTPROXY_PLATFORMS.includes(p.platform as SocialPlatform)
     );
-
-    if (relevant.length === 0) {
-      return NextResponse.json({
-        error: "No matching profiles",
-        groupId,
-        allProfiles: allProfiles.map(p => ({ id: p.id, platform: p.platform, group: p.profile_group_id })),
-      });
-    }
 
     let saved = 0;
     for (const profile of relevant) {
@@ -74,9 +69,8 @@ export async function POST(request: Request) {
       else console.error("[Sync] upsert error", error.message);
     }
 
-    return NextResponse.json({ saved, total: relevant.length, groupId });
+    return NextResponse.json({ saved, total: relevant.length });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : JSON.stringify(error);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return handleApiError(error);
   }
 }
