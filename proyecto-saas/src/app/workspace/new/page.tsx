@@ -1,80 +1,24 @@
-"use client";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { NewWorkspaceClient } from "./NewWorkspaceClient";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+export default async function NewWorkspacePage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-export default function NewWorkspacePage() {
-  const router = useRouter();
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // Fetch existing workspaces the user belongs to
+  const { data: memberships } = await supabase
+    .from("workspace_members")
+    .select("workspace_id, role, workspaces(id, name)")
+    .eq("user_id", user.id);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+  const existingWorkspaces = (memberships ?? [])
+    .map((m) => {
+      const ws = m.workspaces as { id: string; name: string } | null;
+      return ws ? { id: ws.id, name: ws.name, role: m.role } : null;
+    })
+    .filter(Boolean) as { id: string; name: string; role: string }[];
 
-    const res = await fetch("/api/workspaces", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-
-    const json = await res.json();
-
-    if (!res.ok) {
-      setError(json.error ?? "Error al crear el workspace");
-      setLoading(false);
-      return;
-    }
-
-    router.push("/dashboard");
-    router.refresh();
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="bg-white rounded-2xl shadow-sm border p-8 w-full max-w-md">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Crea tu workspace</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Un workspace es el espacio donde gestionarás el contenido de tu marca.
-          </p>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleCreate} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nombre de tu empresa / marca
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoFocus
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Mi Agencia Digital"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center gap-2"
-          >
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {loading ? "Creando..." : "Crear workspace"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+  return <NewWorkspaceClient existingWorkspaces={existingWorkspaces} />;
 }
