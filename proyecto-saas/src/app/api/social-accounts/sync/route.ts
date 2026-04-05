@@ -27,7 +27,12 @@ export async function POST(request: Request) {
 
     // Debug: return raw profiles to diagnose
     if (allProfiles.length === 0) {
-      return NextResponse.json({ error: "Postproxy returned 0 profiles", groupId });
+      // Try raw fetch to see actual response
+      const raw = await fetch("https://api.postproxy.dev/api/profiles", {
+        headers: { "Authorization": `Bearer ${process.env.POSTPROXY_API_KEY}`, "Content-Type": "application/json" },
+      });
+      const rawJson = await raw.json().catch(() => "parse error");
+      return NextResponse.json({ error: "0 profiles", rawStatus: raw.status, rawJson, keySet: !!process.env.POSTPROXY_API_KEY });
     }
 
     // If groupId set, filter by it — otherwise import all Postproxy profiles
