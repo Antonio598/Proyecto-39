@@ -91,6 +91,7 @@ export class KlingClient {
       method: "POST",
       headers: this.headers,
       body: JSON.stringify(bodyPayload),
+      cache: "no-store",
     });
 
     if (!res.ok) {
@@ -111,6 +112,7 @@ export class KlingClient {
       : `${this.baseUrl}/videos/text2video/${jobId}`;
     const res = await fetch(endpoint, {
       headers: this.headers,
+      cache: "no-store",
     });
 
     const data = await res.json();

@@ -65,6 +65,7 @@ export class NanoBananaClient {
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: body ? JSON.stringify(body) : undefined,
+      cache: "no-store",
     });
 
     if (!res.ok) {

@@ -52,10 +52,11 @@ export async function GET(
       {
         provider: post.ai_provider as "nano_banana" | "kling",
         jobId,
-        type: "image",
+        type: post.platform_data?.jobType ?? "image",
       },
       brand?.nano_banana_key ?? undefined,
-      brand?.kling_key ?? undefined
+      brand?.kling_key ?? undefined,
+      post.platform_data
     );
 
     // If completed, update the DB record

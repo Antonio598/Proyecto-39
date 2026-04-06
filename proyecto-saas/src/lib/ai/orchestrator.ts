@@ -119,11 +119,13 @@ export async function startAiGeneration(
 export async function pollJobStatus(
   ref: AiGenerationJobRef,
   nanoBananaKey?: string,
-  klingKey?: string
+  klingKey?: string,
+  platformData?: { referenceImageUrl?: string; jobType?: string }
 ) {
   if (ref.provider === "kling" && klingKey) {
     const kling = new KlingClient(klingKey);
-    return kling.getJobStatus(ref.jobId);
+    const isImg2Vid = !!platformData?.referenceImageUrl;
+    return kling.getJobStatus(ref.jobId, isImg2Vid);
   }
   if (ref.provider === "nano_banana" && nanoBananaKey) {
     const nb = new NanoBananaClient(nanoBananaKey);
