@@ -108,7 +108,7 @@ export default function AiCreatePage() {
     setPipelineState((prev) => ({ ...prev, [step]: status }));
   }
 
-  async function pollJob(jobId: string): Promise<{ status: string; result?: GenerationResult }> {
+  async function pollJob(jobId: string): Promise<{ status: string; result?: { caption?: string; hashtags?: string[]; mediaUrls?: string[] } }> {
     const maxAttempts = 60;
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((r) => setTimeout(r, 3000));

@@ -8,7 +8,6 @@ import { ArrowLeft, Zap, Plus, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { DAY_NAMES, FORMAT_LABELS, PLATFORM_LABELS, PLATFORM_FORMATS } from "@/lib/utils/platform";
-import { PlatformIcon } from "@/components/accounts/PlatformIcon";
 import type { SocialAccount, SocialPlatform, PostFormat } from "@/types/database";
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
