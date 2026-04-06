@@ -31,44 +31,64 @@ export interface NanoBananaResult {
 
 export class NanoBananaClient {
   private apiKey: string;
-  private baseUrl: string;
 
-  constructor(apiKey: string, baseUrl?: string) {
+  constructor(apiKey: string) {
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl ?? "https://api.nanobananaapi.ai/v1";
   }
 
-  private async request<T>(path: string, body: unknown): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+  async generateImage(req: NanoBananaGenerateImageRequest): Promise<NanoBananaResult> {
+    let size = "1024x1024";
+    if (req.height && req.width) {
+      if (req.height > req.width) size = "1024x1792";
+      else if (req.width > req.height) size = "1792x1024";
+    }
+
+    const res = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${this.apiKey}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        model: "dall-e-3",
+        prompt: req.prompt,
+        n: 1,
+        size,
+      }),
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ message: "Unknown error" }));
-      throw new Error(`Nano Banana API error: ${err.message ?? res.statusText}`);
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Nano Banana API error: ${err.error?.message ?? res.statusText}`);
     }
 
-    return res.json();
-  }
-
-  async generateImage(req: NanoBananaGenerateImageRequest): Promise<NanoBananaResult> {
-    return this.request<NanoBananaResult>("/image/generate", req);
+    const data = await res.json();
+    const url = data.data[0].url;
+    
+    // Encode the URL into the jobId so we can remain stateless
+    const base64UrlEncode = (str: string) => Buffer.from(str).toString("base64url");
+    
+    return {
+      jobId: "dalle-" + base64UrlEncode(url),
+      status: "completed",
+    };
   }
 
   async generateCopy(req: NanoBananaGenerateCopyRequest): Promise<NanoBananaResult> {
-    return this.request<NanoBananaResult>("/copy/generate", req);
+    throw new Error("Not implemented here (use OpenAI API directly)");
   }
 
   async getJobStatus(jobId: string): Promise<NanoBananaResult> {
-    const res = await fetch(`${this.baseUrl}/jobs/${jobId}`, {
-      headers: { Authorization: `Bearer ${this.apiKey}` },
-    });
-    return res.json();
+    if (jobId.startsWith("dalle-")) {
+      const b64 = jobId.replace("dalle-", "");
+      const url = Buffer.from(b64, "base64url").toString("utf-8");
+      return {
+        jobId,
+        status: "completed",
+        imageUrl: url,
+      };
+    }
+    throw new Error(`Job not found: ${jobId}`);
   }
 }
 
