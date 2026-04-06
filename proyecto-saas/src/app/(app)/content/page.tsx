@@ -7,6 +7,7 @@ import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { ImageIcon, Video, Music, FileText, Upload, Trash2, Search, Filter } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
 import type { ContentAsset, AssetType } from "@/types/database";
 
 const TYPE_FILTERS: { label: string; value: AssetType | "all"; icon: React.ElementType }[] = [
@@ -67,15 +68,19 @@ export default function ContentPage() {
           });
           const { data } = await res.json();
 
-          // 2. Upload directly to Supabase Storage
-          await fetch(data.signedUrl, {
-            method: "PUT",
-            body: file,
-            headers: { "Content-Type": file.type },
-          });
+          // 2. Upload directly to Supabase Storage using the signed URL and token
+          const supabase = createClient();
+          const { error: uploadError } = await supabase.storage
+            .from("workspace-media")
+            .uploadToSignedUrl(data.path, data.token, file);
+
+          if (uploadError) {
+            throw uploadError;
+          }
 
           success++;
-        } catch {
+        } catch (error) {
+          console.error("Upload error:", error);
           toast.error(`Error al subir ${file.name}`);
         }
       }

@@ -42,7 +42,7 @@ export async function getPresignedUploadUrl(
   workspaceId: string,
   fileName: string,
   folder = "uploads"
-): Promise<{ signedUrl: string; path: string; publicUrl: string }> {
+): Promise<{ signedUrl: string; path: string; publicUrl: string; token: string }> {
   const supabase = createAdminClient();
   const path = getStoragePath(workspaceId, folder, fileName);
 
@@ -56,5 +56,5 @@ export async function getPresignedUploadUrl(
     .from(BUCKETS.MEDIA)
     .getPublicUrl(path);
 
-  return { signedUrl: data.signedUrl, path, publicUrl };
+  return { signedUrl: data.signedUrl, token: data.token, path, publicUrl };
 }

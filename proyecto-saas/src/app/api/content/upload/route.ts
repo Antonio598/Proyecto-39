@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "fileName and mimeType required" }, { status: 400 });
     }
 
-    const { signedUrl, path, publicUrl } = await getPresignedUploadUrl(
+    const { signedUrl, path, publicUrl, token } = await getPresignedUploadUrl(
       workspaceId,
       fileName,
       folder
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ data: { asset, signedUrl, publicUrl } });
+    return NextResponse.json({ data: { asset, signedUrl, token, path, publicUrl } });
   } catch (error) {
     return handleApiError(error);
   }

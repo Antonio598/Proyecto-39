@@ -49,6 +49,7 @@ export default function CreateRulePage() {
   const [aiUseHashtags, setAiUseHashtags] = useState(true);
   const [aiUseEmojis, setAiUseEmojis] = useState(true);
   const [aiBasePrompt, setAiBasePrompt] = useState("");
+  const [aiUseMediaBank, setAiUseMediaBank] = useState(false);
 
   const { data: accounts = [] } = useQuery<SocialAccount[]>({
     queryKey: ["accounts", activeWorkspaceId],
@@ -121,6 +122,7 @@ export default function CreateRulePage() {
         useHashtags: aiUseHashtags,
         useEmojis: aiUseEmojis,
         basePrompt: aiBasePrompt || null,
+        useMediaBank: aiUseMediaBank,
       },
     };
 
@@ -258,6 +260,16 @@ export default function CreateRulePage() {
               <input type="checkbox" checked={aiUseEmojis} onChange={(e) => setAiUseEmojis(e.target.checked)} className="rounded" />
               <span className="text-sm">Incluir emojis</span>
             </label>
+          </div>
+          
+          <div className="pt-2 border-t border-indigo-100">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={aiUseMediaBank} onChange={(e) => setAiUseMediaBank(e.target.checked)} className="rounded" />
+              <span className="text-sm font-medium">Priorizar el uso de fotos/videos del banco multimedia</span>
+            </label>
+            <p className="text-xs text-muted-foreground mt-1 ml-6">
+              Si se activa, la IA intentará buscar y adjuntar archivos de tu banco multimedia que encajen con la publicación en lugar de generar imágenes nuevas.
+            </p>
           </div>
         </div>
 
