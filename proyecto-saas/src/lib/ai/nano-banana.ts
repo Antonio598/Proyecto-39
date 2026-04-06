@@ -29,6 +29,25 @@ export interface NanoBananaResult {
   error?: string;
 }
 
+interface BananaResponse {
+  task_id?: string;
+  data?: {
+    task_id?: string;
+    status?: string;
+    output?: {
+      primary_url?: string;
+      images?: { url?: string }[];
+    };
+    error_message?: string;
+  };
+  status?: string;
+  output?: {
+    primary_url?: string;
+    images?: { url?: string }[];
+  };
+  error_message?: string;
+}
+
 export class NanoBananaClient {
   private apiKey: string;
   private baseUrl: string;
@@ -66,23 +85,23 @@ export class NanoBananaClient {
         : "1:1"
     };
 
-    const res = await this.request<any>("/images/generate", payload);
+    const res = await this.request<BananaResponse>("/images/generate", payload);
     
     // Fallback parsing just in case response changes slightly
     const taskId = res.data?.task_id || res.task_id;
     
     return {
-      jobId: taskId,
+      jobId: taskId || "",
       status: "pending",
     };
   }
 
-  async generateCopy(req: NanoBananaGenerateCopyRequest): Promise<NanoBananaResult> {
+  async generateCopy(_req: NanoBananaGenerateCopyRequest): Promise<NanoBananaResult> {
     throw new Error("Not implemented (use OpenAI API directly)");
   }
 
   async getJobStatus(jobId: string): Promise<NanoBananaResult> {
-    const res = await this.request<any>(`/images/${jobId}`, undefined, "GET");
+    const res = await this.request<BananaResponse>(`/images/${jobId}`, undefined, "GET");
     const task = res.data ?? res;
 
     let mappedStatus: NanoBananaResult["status"] = "pending";
