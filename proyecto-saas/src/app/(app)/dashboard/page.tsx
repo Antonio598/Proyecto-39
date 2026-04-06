@@ -122,8 +122,8 @@ export default async function DashboardPage() {
         {[
           { href: "/create/ai", label: "Generar con IA", emoji: "✨", color: "from-indigo-500 to-purple-600" },
           { href: "/calendar", label: "Ver calendario", emoji: "📅", color: "from-blue-500 to-cyan-600" },
-          { href: "/accounts/connect", label: "Conectar cuenta", emoji: "🔗", color: "from-green-500 to-emerald-600" },
           { href: "/automation/create", label: "Nueva regla", emoji: "⚡", color: "from-orange-500 to-red-500" },
+          { href: "/workspace/integrations", label: "APIs de IA", emoji: "🔑", color: "from-violet-500 to-purple-700" },
         ].map((action) => (
           <Link
             key={action.href}

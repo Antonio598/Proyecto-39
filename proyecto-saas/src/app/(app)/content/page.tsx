@@ -89,6 +89,18 @@ export default function ContentPage() {
     [activeWorkspaceId, uploading, queryClient]
   );
 
+  const deleteMutation = useMutation({
+    mutationFn: async (assetId: string) => {
+      const res = await fetch(`/api/content/${assetId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Error al eliminar");
+    },
+    onSuccess: () => {
+      toast.success("Archivo eliminado");
+      queryClient.invalidateQueries({ queryKey: ["assets", activeWorkspaceId] });
+    },
+    onError: () => toast.error("Error al eliminar el archivo"),
+  });
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
@@ -202,7 +214,14 @@ export default function ContentPage() {
 
               {/* Overlay on hover */}
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
-                <button className="self-end p-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                <button
+                  onClick={() => {
+                    if (confirm("¿Eliminar este archivo?")) {
+                      deleteMutation.mutate(asset.id);
+                    }
+                  }}
+                  className="self-end p-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
                 <p className="text-white text-xs truncate font-medium">{asset.file_name}</p>

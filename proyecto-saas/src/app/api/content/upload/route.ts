@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { getPresignedUploadUrl, getAssetTypeFromMime } from "@/lib/storage/upload";
 import { handleApiError } from "@/lib/utils/errors";
@@ -20,8 +20,8 @@ export async function POST(request: Request) {
       folder
     );
 
-    // Pre-create the DB record (will be confirmed after upload)
-    const supabase = await createClient();
+    // Pre-create the DB record (admin client bypasses RLS)
+    const supabase = createAdminClient();
     const assetType = getAssetTypeFromMime(mimeType);
 
     const { data: asset, error } = await supabase

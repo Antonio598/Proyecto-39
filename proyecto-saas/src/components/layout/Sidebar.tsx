@@ -8,7 +8,7 @@ import { useUiStore } from "@/store/ui.store";
 import {
   LayoutDashboard, Calendar, ImageIcon, Sparkles,
   CheckSquare, Zap, BarChart2, Palette, Settings,
-  ChevronLeft, ChevronRight, Users, Link2,
+  ChevronLeft, ChevronRight, Users, Link2, KeyRound,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
 ];
 
 const BOTTOM_ITEMS = [
+  { href: "/workspace/integrations", label: "APIs de IA", icon: KeyRound },
   { href: "/brand", label: "Kit de marca", icon: Palette },
   { href: "/workspace/members", label: "Equipo", icon: Users },
   { href: "/workspace/settings", label: "Configuración", icon: Settings },
