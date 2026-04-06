@@ -31,64 +31,75 @@ export interface NanoBananaResult {
 
 export class NanoBananaClient {
   private apiKey: string;
+  private baseUrl: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, baseUrl?: string) {
     this.apiKey = apiKey;
+    this.baseUrl = baseUrl ?? "https://gateway.bananapro.site/api/v1";
   }
 
-  async generateImage(req: NanoBananaGenerateImageRequest): Promise<NanoBananaResult> {
-    let size = "1024x1024";
-    if (req.height && req.width) {
-      if (req.height > req.width) size = "1024x1792";
-      else if (req.width > req.height) size = "1792x1024";
-    }
-
-    const res = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
+  private async request<T>(path: string, body?: unknown, method = "POST"): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${this.apiKey}`,
       },
-      body: JSON.stringify({
-        model: "dall-e-3",
-        prompt: req.prompt,
-        n: 1,
-        size,
-      }),
+      body: body ? JSON.stringify(body) : undefined,
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(`Nano Banana API error: ${err.error?.message ?? res.statusText}`);
+      const err = await res.json().catch(() => ({ message: "Unknown error" }));
+      throw new Error(`Nano Banana API error: ${err.message ?? err.error?.message ?? res.statusText}`);
     }
 
-    const data = await res.json();
-    const url = data.data[0].url;
+    return res.json();
+  }
+
+  async generateImage(req: NanoBananaGenerateImageRequest): Promise<NanoBananaResult> {
+    const payload = {
+      model: "nano-banana-pro",
+      prompt: req.prompt,
+      resolution: "1K", // "2K" or "4K" could be used based on config
+      aspect_ratio: req.height && req.width 
+        ? req.height > req.width ? "9:16" : req.width > req.height ? "16:9" : "1:1"
+        : "1:1"
+    };
+
+    const res = await this.request<any>("/images/generate", payload);
     
-    // Encode the URL into the jobId so we can remain stateless
-    const base64UrlEncode = (str: string) => Buffer.from(str).toString("base64url");
+    // Fallback parsing just in case response changes slightly
+    const taskId = res.data?.task_id || res.task_id;
     
     return {
-      jobId: "dalle-" + base64UrlEncode(url),
-      status: "completed",
+      jobId: taskId,
+      status: "pending",
     };
   }
 
   async generateCopy(req: NanoBananaGenerateCopyRequest): Promise<NanoBananaResult> {
-    throw new Error("Not implemented here (use OpenAI API directly)");
+    throw new Error("Not implemented (use OpenAI API directly)");
   }
 
   async getJobStatus(jobId: string): Promise<NanoBananaResult> {
-    if (jobId.startsWith("dalle-")) {
-      const b64 = jobId.replace("dalle-", "");
-      const url = Buffer.from(b64, "base64url").toString("utf-8");
-      return {
-        jobId,
-        status: "completed",
-        imageUrl: url,
-      };
+    const res = await this.request<any>(`/images/${jobId}`, undefined, "GET");
+    const task = res.data ?? res;
+
+    let mappedStatus: NanoBananaResult["status"] = "pending";
+    if (task.status === "completed" || task.status === "succeed" || task.status === "success") {
+      mappedStatus = "completed";
+    } else if (task.status === "failed") {
+      mappedStatus = "failed";
+    } else if (task.status === "processing" || task.status === "generating") {
+      mappedStatus = "processing";
     }
-    throw new Error(`Job not found: ${jobId}`);
+
+    return {
+      jobId,
+      status: mappedStatus,
+      imageUrl: task.output?.primary_url ?? task.output?.images?.[0]?.url ?? undefined,
+      error: task.error_message ?? undefined,
+    };
   }
 }
 
