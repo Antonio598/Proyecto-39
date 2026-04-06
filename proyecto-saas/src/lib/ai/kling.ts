@@ -36,17 +36,33 @@ export class KlingClient {
   }
 
   async generateVideo(req: KlingGenerateVideoRequest): Promise<KlingJobResult> {
-    const res = await fetch(`${this.baseUrl}/videos/text2video`, {
+    // Use image2video when a reference image is provided, otherwise text2video
+    const endpoint = req.referenceImageUrl
+      ? `${this.baseUrl}/videos/image2video`
+      : `${this.baseUrl}/videos/text2video`;
+
+    const bodyPayload = req.referenceImageUrl
+      ? {
+          image_url: req.referenceImageUrl,
+          prompt: req.prompt,
+          negative_prompt: req.negativePrompt,
+          cfg_scale: 0.5,
+          mode: "std",
+          duration: req.duration ?? 5,
+        }
+      : {
+          prompt: req.prompt,
+          negative_prompt: req.negativePrompt,
+          cfg_scale: 0.5,
+          mode: "std",
+          duration: req.duration ?? 5,
+          aspect_ratio: req.aspectRatio ?? "9:16",
+        };
+
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: this.headers,
-      body: JSON.stringify({
-        prompt: req.prompt,
-        negative_prompt: req.negativePrompt,
-        cfg_scale: 0.5,
-        mode: "std",
-        duration: req.duration ?? 5,
-        aspect_ratio: req.aspectRatio ?? "9:16",
-      }),
+      body: JSON.stringify(bodyPayload),
     });
 
     if (!res.ok) {
@@ -61,8 +77,11 @@ export class KlingClient {
     };
   }
 
-  async getJobStatus(jobId: string): Promise<KlingJobResult> {
-    const res = await fetch(`${this.baseUrl}/videos/text2video/${jobId}`, {
+  async getJobStatus(jobId: string, isImage2Video = false): Promise<KlingJobResult> {
+    const endpoint = isImage2Video
+      ? `${this.baseUrl}/videos/image2video/${jobId}`
+      : `${this.baseUrl}/videos/text2video/${jobId}`;
+    const res = await fetch(endpoint, {
       headers: this.headers,
     });
 

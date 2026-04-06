@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
     const {
       primaryColor, secondaryColor, fontPrimary, toneOfVoice,
-      niche, guidelines, aiContext, nanoBananaKey, klingKey,
+      niche, guidelines, aiContext, nanoBananaKey, klingKey, openaiKey,
     } = body;
 
     // Update brand settings
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     if (error) throw error;
 
     // Store API keys in workspace metadata (using admin client)
-    if (nanoBananaKey || klingKey) {
+    if (nanoBananaKey || klingKey || openaiKey) {
       const { data: ws } = await adminSupabase
         .from("workspaces")
         .select("metadata")
@@ -65,6 +65,7 @@ export async function POST(request: Request) {
 
       if (nanoBananaKey) updatedMeta.nano_banana_key = nanoBananaKey;
       if (klingKey) updatedMeta.kling_key = klingKey;
+      if (openaiKey) updatedMeta.openai_key = openaiKey;
 
       await adminSupabase
         .from("workspaces")
