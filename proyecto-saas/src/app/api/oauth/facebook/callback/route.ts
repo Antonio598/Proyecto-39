@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { upsertSocialAccount } from "@/lib/supabase/queries/social-accounts";
-import { handleApiError, ApiError } from "@/lib/utils/errors";
+import { ApiError } from "@/lib/utils/errors";
 
 export async function GET(request: Request) {
   try {

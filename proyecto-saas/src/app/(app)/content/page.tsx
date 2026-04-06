@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
-import { ImageIcon, Video, Music, FileText, Upload, Trash2, Search, Filter } from "lucide-react";
+import { ImageIcon, Video, Music, FileText, Upload, Trash2, Search } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";

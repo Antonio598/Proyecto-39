@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth/session";
 import { initializeConnection, type PostproxyPlatform } from "@/lib/postproxy";
-import { handleApiError } from "@/lib/utils/errors";
+
 
 const SUPPORTED_PLATFORMS: PostproxyPlatform[] = ["facebook", "instagram", "linkedin", "tiktok"];
 

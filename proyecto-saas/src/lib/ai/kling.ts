@@ -46,7 +46,7 @@ export class KlingClient {
     const exp = nbf + 1805;
     const payload = { iss: ak, nbf, exp };
 
-    const base64UrlEncode = (obj: any) =>
+    const base64UrlEncode = (obj: Record<string, unknown>) =>
       Buffer.from(JSON.stringify(obj)).toString("base64url");
 
     const unsignedToken = `${base64UrlEncode(header)}.${base64UrlEncode(payload)}`;

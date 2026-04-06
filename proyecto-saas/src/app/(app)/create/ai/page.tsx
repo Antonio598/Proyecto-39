@@ -5,7 +5,7 @@ import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useQuery } from "@tanstack/react-query";
 import {
   Sparkles, Loader2, CheckCircle, AlertCircle, ArrowLeft,
-  ImageIcon, Video, FileText, Library, Copy, RefreshCw, KeyRound,
+  Library, Copy, RefreshCw, KeyRound,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";

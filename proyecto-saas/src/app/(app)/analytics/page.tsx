@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import { listSocialAccounts } from "@/lib/supabase/queries/social-accounts";
 import { getScheduledPosts } from "@/lib/supabase/queries/posts";
 import { PlatformIcon } from "@/components/accounts/PlatformIcon";
-import { PLATFORM_LABELS } from "@/lib/utils/platform";
 import { BarChart2, TrendingUp, Users, Send, CheckCircle } from "lucide-react";
 import type { Metadata } from "next";
 
@@ -37,13 +36,7 @@ export default async function AnalyticsPage() {
     return acc;
   }, {} as Record<string, { account: typeof accounts[0]; count: number }>);
 
-  // Last 7 days activity
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }).reverse();
+  // Removed unused last7Days variable
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">

@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     const {
       socialAccountId, generatedPostId, scheduledAt,
-      publishMode = "approval", format,
+      publishMode = "approval",
     } = body;
 
     if (!socialAccountId || !scheduledAt) {

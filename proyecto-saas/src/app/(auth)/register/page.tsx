@@ -15,7 +15,6 @@ export default function RegisterPage() {
   const [workspaceName, setWorkspaceName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -50,22 +49,7 @@ export default function RegisterPage() {
     router.refresh();
   }
 
-  if (success) {
-    return (
-      <div className="text-center">
-        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">¡Verifica tu email!</h3>
-        <p className="text-sm text-gray-600">
-          Te enviamos un enlace de verificación a <strong>{email}</strong>.
-          Revisa tu bandeja de entrada.
-        </p>
-      </div>
-    );
-  }
+  // success check removed as auto-signin redirects immediately
 
   return (
     <>

@@ -15,7 +15,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameM
 import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Calendar, Plus, List } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { STATUS_COLORS, STATUS_LABELS, FORMAT_EMOJI, PLATFORM_LABELS } from "@/lib/utils/platform";
+import { STATUS_COLORS, STATUS_LABELS, FORMAT_EMOJI } from "@/lib/utils/platform";
 import { PlatformIcon } from "@/components/accounts/PlatformIcon";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -203,7 +203,7 @@ export default function CalendarPage() {
 
             {/* Calendar grid */}
             <div className="grid grid-cols-7">
-              {paddedDays.map((day, idx) => {
+              {paddedDays.map((day) => {
                 const dayPosts = getPostsForDay(day);
                 const isCurrentMonth = isSameMonth(day, currentDate);
                 const isDayToday = isToday(day);

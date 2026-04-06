@@ -23,7 +23,7 @@ export function handleApiError(error: unknown): NextResponse {
 
   return NextResponse.json(
     { error: error instanceof Error ? error.message : "Internal server error" },
-    { status: error instanceof Error && 'status' in error ? (error as any).status : 500 }
+    { status: error instanceof Error && 'status' in error ? (error as Error & { status?: number }).status ?? 500 : 500 }
   );
 }
 

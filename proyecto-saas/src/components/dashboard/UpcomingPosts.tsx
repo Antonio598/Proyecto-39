@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatRelative } from "@/lib/utils/dates";
-import { STATUS_COLORS, STATUS_LABELS, FORMAT_EMOJI, PLATFORM_LABELS } from "@/lib/utils/platform";
+import { STATUS_COLORS, STATUS_LABELS, FORMAT_EMOJI } from "@/lib/utils/platform";
 import { PlatformIcon } from "@/components/accounts/PlatformIcon";
 import type { ScheduledPost } from "@/types/database";
 import { CalendarClock, ArrowRight } from "lucide-react";

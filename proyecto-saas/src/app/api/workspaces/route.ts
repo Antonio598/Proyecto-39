@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createProfileGroup } from "@/lib/postproxy";
-import { handleApiError } from "@/lib/utils/errors";
+
 
 export async function POST(request: Request) {
   try {

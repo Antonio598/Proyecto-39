@@ -7,7 +7,7 @@ import { AccountsOverview } from "@/components/dashboard/AccountsOverview";
 import { listSocialAccounts } from "@/lib/supabase/queries/social-accounts";
 import { getScheduledPosts, getPendingApprovals, getUpcomingPosts } from "@/lib/supabase/queries/posts";
 import {
-  LayoutDashboard, CheckSquare, Send, Link2, Users, TrendingUp,
+  LayoutDashboard, CheckSquare, Send, Link2, Users,
 } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
