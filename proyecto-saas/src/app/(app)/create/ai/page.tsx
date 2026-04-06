@@ -66,14 +66,25 @@ const PIPELINE_STEPS: PipelineStep[] = [
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`;
+}
+
 async function pollJobUntilDone(
   jobId: string,
   workspaceId: string,
-  maxSeconds = 300
+  maxSeconds = 600,
+  onTick?: (elapsed: number) => void,
 ): Promise<{ mediaUrls?: string[]; caption?: string; hashtags?: string[] } | null> {
-  const maxAttempts = Math.floor(maxSeconds / 4);
+  const interval = 5000; // 5 seconds between polls
+  const maxAttempts = Math.floor((maxSeconds * 1000) / interval);
+  let elapsed = 0;
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, 4000));
+    await new Promise((r) => setTimeout(r, interval));
+    elapsed += Math.floor(interval / 1000);
+    onTick?.(elapsed);
     const res = await fetch(`/api/ai/status/${jobId}`, {
       headers: { "x-workspace-id": workspaceId },
     });
@@ -114,6 +125,7 @@ export default function AiCreatePage() {
     script: "pending", image: "pending", video: "pending",
   });
   const [stepError, setStepError] = useState<Partial<Record<StepId, string>>>({});
+  const [stepElapsed, setStepElapsed] = useState<Partial<Record<StepId, number>>>({});
 
   // Intermediate results (shown progressively)
   const [scriptData, setScriptData] = useState<ScriptData | null>(null);
@@ -167,6 +179,7 @@ export default function AiCreatePage() {
     setRunning(false);
     setStepStatus({ script: "pending", image: "pending", video: "pending" });
     setStepError({});
+    setStepElapsed({});
     setScriptData(null);
     setGeneratedImageUrl(null);
     setFinalResult(null);
@@ -241,14 +254,19 @@ export default function AiCreatePage() {
           if (!imgRes.ok) {
             setStep("image", "error", imgJson.error ?? "Error al generar imagen");
           } else {
-            const imgResult = await pollJobUntilDone(imgJson.data.jobId, activeWorkspaceId, 180);
+            const imgResult = await pollJobUntilDone(
+              imgJson.data.jobId,
+              activeWorkspaceId,
+              600,
+              (s) => setStepElapsed((p) => ({ ...p, image: s })),
+            );
             if (imgResult?.mediaUrls?.[0]) {
               imageUrl = imgResult.mediaUrls[0];
               setGeneratedImageUrl(imageUrl);
               setStep("image", "done");
               toast.success("Imagen generada ✓");
             } else {
-              setStep("image", "error", "Nano Banana no respondió a tiempo");
+              setStep("image", "error", "Nano Banana no respondió (revisa tu API key en Integraciones)");
             }
           }
         } else {
@@ -285,13 +303,18 @@ export default function AiCreatePage() {
         if (!videoRes.ok) {
           setStep("video", "error", videoJson.error ?? "Error al generar video");
         } else {
-          const videoResult = await pollJobUntilDone(videoJson.data.jobId, activeWorkspaceId, 300);
+          const videoResult = await pollJobUntilDone(
+            videoJson.data.jobId,
+            activeWorkspaceId,
+            900,
+            (s) => setStepElapsed((p) => ({ ...p, video: s })),
+          );
           if (videoResult?.mediaUrls?.[0]) {
             videoUrl = videoResult.mediaUrls[0];
             setStep("video", "done");
             toast.success("Video generado ✓");
           } else {
-            setStep("video", "error", "Kling no respondió a tiempo");
+            setStep("video", "error", "Kling no respondió (revisa tu API key en Integraciones)");
           }
         }
       } else if (isVideo && skipVideo) {
@@ -555,12 +578,24 @@ export default function AiCreatePage() {
                         status === "skipped" ? "bg-gray-100 text-gray-500" :
                         "bg-muted text-muted-foreground"
                       )}>
-                        {status === "running" ? "Procesando..." :
-                         status === "done" ? "✓ Listo" :
-                         status === "error" ? "Error" :
-                         status === "skipped" ? "Omitido" : "Pendiente"}
+                        {status === "running"
+                          ? stepElapsed[step.id]
+                            ? `⏳ ${formatElapsed(stepElapsed[step.id]!)}`
+                            : "Iniciando..."
+                          : status === "done" ? "✓ Listo"
+                          : status === "error" ? "Error"
+                          : status === "skipped" ? "Omitido" : "Pendiente"}
                       </span>
                     </div>
+                    {status === "running" && (
+                      <p className="text-xs text-muted-foreground mt-1 ml-12">
+                        {step.id === "image"
+                          ? "La generación de imágenes puede tardar 2–5 minutos, por favor espera…"
+                          : step.id === "video"
+                          ? "La generación de video puede tardar 5–15 minutos, por favor espera…"
+                          : "Procesando…"}
+                      </p>
+                    )}
                     {errMsg && (
                       <p className="text-xs text-red-600 mt-1 ml-12">{errMsg}</p>
                     )}
