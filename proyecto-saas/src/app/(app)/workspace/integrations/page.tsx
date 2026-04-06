@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { KeyRound, Save, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -60,6 +60,7 @@ const KEY_FIELDS: KeyField[] = [
 export default function IntegrationsPage() {
   const { activeWorkspaceId } = useWorkspace();
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [keys, setKeys] = useState<Record<string, string>>({
     openaiKey: "",
     nanoBananaKey: "",
@@ -68,8 +69,33 @@ export default function IntegrationsPage() {
   const [show, setShow] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
 
+  // Load which keys are already configured
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    fetch("/api/brand", { headers: { "x-workspace-id": activeWorkspaceId } })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.keys) {
+          setSaved({
+            openaiKey: !!json.keys.hasOpenaiKey,
+            nanoBananaKey: !!json.keys.hasNanoBananaKey,
+            klingKey: !!json.keys.hasKlingKey,
+          });
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [activeWorkspaceId]);
+
   function toggleShow(id: string) {
     setShow((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   async function handleSave(e: React.FormEvent) {

@@ -8,14 +8,23 @@ export async function GET(request: Request) {
   try {
     const { workspaceId } = await requireWorkspaceAccess(request);
     const supabase = await createClient();
+    const adminSupabase = createAdminClient();
 
-    const { data } = await supabase
-      .from("brand_settings")
-      .select("*")
-      .eq("workspace_id", workspaceId)
-      .single();
+    const [brandRes, wsRes] = await Promise.all([
+      supabase.from("brand_settings").select("*").eq("workspace_id", workspaceId).single(),
+      adminSupabase.from("workspaces").select("metadata").eq("id", workspaceId).single(),
+    ]);
 
-    return NextResponse.json({ data });
+    const meta = (wsRes.data?.metadata as Record<string, string>) ?? {};
+
+    return NextResponse.json({
+      data: brandRes.data,
+      keys: {
+        hasOpenaiKey: !!meta.openai_key,
+        hasNanoBananaKey: !!meta.nano_banana_key,
+        hasKlingKey: !!meta.kling_key,
+      },
+    });
   } catch (error) {
     return handleApiError(error);
   }
