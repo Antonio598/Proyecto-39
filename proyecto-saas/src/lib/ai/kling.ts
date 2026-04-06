@@ -1,14 +1,14 @@
-// Kling API client — for video generation (Reels, Shorts, long videos)
-import crypto from "crypto";
+// Kling3API client — https://kling3api.com
+// Simple Bearer token auth, no JWT needed
 
 export interface KlingGenerateVideoRequest {
   prompt: string;
   negativePrompt?: string;
-  duration?: number;       // seconds
+  duration?: 5 | 10;
   aspectRatio?: "9:16" | "16:9" | "1:1";
-  style?: string;
-  referenceImageUrl?: string;
-  model?: "kling-v1" | "kling-v1-5";
+  mode?: "std" | "pro";
+  version?: string;
+  referenceImageUrl?: string; // image-to-video when provided
 }
 
 export interface KlingJobResult {
@@ -26,112 +26,108 @@ export class KlingClient {
 
   constructor(apiKey: string, baseUrl?: string) {
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl ?? "https://api.klingai.com/v1";
+    this.baseUrl = (baseUrl ?? "https://kling3api.com").replace(/\/$/, "");
   }
 
   private get headers() {
-    let ak = this.apiKey;
-    let sk = "";
-    if (this.apiKey.includes(":")) {
-      [ak, sk] = this.apiKey.split(":", 2);
-    } else if (this.apiKey.includes(",")) {
-      [ak, sk] = this.apiKey.split(",", 2);
-    } else {
-      // Missing SK, fallback to trying raw key or erroring
-      sk = ak;
-    }
-
-    const header = { alg: "HS256", typ: "JWT" };
-    const nbf = Math.floor(Date.now() / 1000) - 5;
-    const exp = nbf + 1805;
-    const payload = { iss: ak, nbf, exp };
-
-    const base64UrlEncode = (obj: Record<string, unknown>) =>
-      Buffer.from(JSON.stringify(obj)).toString("base64url");
-
-    const unsignedToken = `${base64UrlEncode(header)}.${base64UrlEncode(payload)}`;
-    const signature = crypto
-      .createHmac("sha256", sk)
-      .update(unsignedToken)
-      .digest("base64url");
-
-    const token = `${unsignedToken}.${signature}`;
-
     return {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${this.apiKey}`,
     };
   }
 
   async generateVideo(req: KlingGenerateVideoRequest): Promise<KlingJobResult> {
-    // Use image2video when a reference image is provided, otherwise text2video
-    const endpoint = req.referenceImageUrl
-      ? `${this.baseUrl}/videos/image2video`
-      : `${this.baseUrl}/videos/text2video`;
+    const input: Record<string, unknown> = {
+      prompt: req.prompt,
+      duration: req.duration ?? 5,
+      aspect_ratio: req.aspectRatio ?? "9:16",
+      mode: req.mode ?? "std",
+      version: req.version ?? "2.6",
+      cfg_scale: 0.5,
+    };
 
-    const bodyPayload = req.referenceImageUrl
-      ? {
-          image_url: req.referenceImageUrl,
-          prompt: req.prompt,
-          negative_prompt: req.negativePrompt,
-          cfg_scale: 0.5,
-          mode: "std",
-          duration: req.duration ?? 5,
-        }
-      : {
-          prompt: req.prompt,
-          negative_prompt: req.negativePrompt,
-          cfg_scale: 0.5,
-          mode: "std",
-          duration: req.duration ?? 5,
-          aspect_ratio: req.aspectRatio ?? "9:16",
-        };
+    if (req.negativePrompt) input.negative_prompt = req.negativePrompt;
+    if (req.referenceImageUrl) input.image_url = req.referenceImageUrl;
 
-    const res = await fetch(endpoint, {
+    const body = {
+      model: "kling",
+      task_type: "video_generation",
+      input,
+    };
+
+    const res = await fetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
       headers: this.headers,
-      body: JSON.stringify(bodyPayload),
+      body: JSON.stringify(body),
       cache: "no-store",
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Kling API error: ${err.message ?? res.statusText}`);
+      const msg = (err as { message?: string; error?: string; data?: { message?: string } })
+        .message ??
+        (err as { data?: { message?: string } }).data?.message ??
+        (err as { error?: string }).error ??
+        res.statusText;
+      throw new Error(`Kling API error (${res.status}): ${msg}`);
     }
 
-    const data = await res.json();
-    return {
-      jobId: data.data?.task_id ?? data.task_id,
-      status: "pending",
+    const data = await res.json() as {
+      code?: number;
+      message?: string;
+      data?: { task_id?: string; status?: string };
+      task_id?: string;
     };
+
+    const taskId = data.data?.task_id ?? data.task_id;
+    if (!taskId) {
+      throw new Error(`Kling API: no task_id in response — ${JSON.stringify(data)}`);
+    }
+
+    return { jobId: taskId, status: "pending" };
   }
 
-  async getJobStatus(jobId: string, isImage2Video = false): Promise<KlingJobResult> {
-    const endpoint = isImage2Video
-      ? `${this.baseUrl}/videos/image2video/${jobId}`
-      : `${this.baseUrl}/videos/text2video/${jobId}`;
-    const res = await fetch(endpoint, {
+  async getJobStatus(jobId: string): Promise<KlingJobResult> {
+    const res = await fetch(`${this.baseUrl}/api/status?task_id=${encodeURIComponent(jobId)}`, {
       headers: this.headers,
       cache: "no-store",
     });
 
-    const data = await res.json();
-    const task = data.data ?? data;
+    if (!res.ok) {
+      return { jobId, status: "failed", error: `HTTP ${res.status}` };
+    }
 
-    return {
-      jobId,
-      status:
-        task.task_status === "succeed"
-          ? "completed"
-          : task.task_status === "failed"
-          ? "failed"
-          : task.task_status === "processing"
-          ? "processing"
-          : "pending",
-      progress: task.task_progress ?? undefined,
-      videoUrl: task.task_result?.videos?.[0]?.url ?? undefined,
-      thumbnailUrl: task.task_result?.videos?.[0]?.cover_image_url ?? undefined,
-      error: task.task_status_msg ?? undefined,
+    const data = await res.json() as {
+      code?: number;
+      message?: string;
+      data?: {
+        task_id?: string;
+        status?: string;
+        response?: string[];
+        video_url?: string;
+        output?: { video_url?: string };
+      };
+      status?: string;
+      response?: string[];
     };
+
+    const task = data.data ?? data;
+    const rawStatus = ((task as { status?: string }).status ?? "").toLowerCase();
+
+    const status: KlingJobResult["status"] =
+      rawStatus === "completed" || rawStatus === "success" || rawStatus === "succeed"
+        ? "completed"
+        : rawStatus === "failed" || rawStatus === "error"
+        ? "failed"
+        : "processing";
+
+    // Extract video URL from various possible response shapes
+    const responseArr = (task as { response?: string[] }).response;
+    const videoUrl: string | undefined =
+      (task as { video_url?: string }).video_url ??
+      (task as { output?: { video_url?: string } }).output?.video_url ??
+      (Array.isArray(responseArr) && responseArr.length > 0 ? responseArr[0] : undefined);
+
+    return { jobId, status, videoUrl };
   }
 }

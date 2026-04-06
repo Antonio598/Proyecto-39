@@ -11,7 +11,7 @@ export interface AiGenerationRequest {
   useHashtags?: boolean;
   useEmojis?: boolean;
   aspectRatio?: "9:16" | "16:9" | "1:1";
-  referenceImageUrl?: string;   // image URL to use as reference for video generation
+  referenceImageUrl?: string;
   brandContext?: string;
   nanoBananaKey?: string;
   klingKey?: string;
@@ -36,44 +36,19 @@ export function getAspectRatioForFormat(
   return "1:1";
 }
 
-export function buildSystemPrompt(
-  format: PostFormat,
-  platform: SocialPlatform,
-  tone: string,
-  language: string,
-  brandContext?: string
-): string {
-  const platformName = { instagram: "Instagram", facebook: "Facebook", youtube: "YouTube", linkedin: "LinkedIn", tiktok: "TikTok" }[platform];
-  const formatName = {
-    image: "imagen", carousel: "carrusel", reel: "Reel", story: "Story",
-    short: "YouTube Short", long_video: "video largo", text: "publicación de texto",
-  }[format];
-
-  let prompt = `Eres un experto en marketing de contenidos para ${platformName}.
-Genera el caption/copy para un ${formatName}.
-Idioma: ${language === "es" ? "español" : language}.
-Tono: ${tone}.`;
-
-  if (brandContext) {
-    prompt += `\nContexto de marca: ${brandContext}`;
-  }
-
-  return prompt;
-}
-
 export async function startAiGeneration(
   req: AiGenerationRequest
 ): Promise<AiGenerationJobRef> {
   const isVideo = VIDEO_FORMATS.includes(req.format);
   const isImage = IMAGE_FORMATS.includes(req.format);
 
+  // ── VIDEO: Kling ────────────────────────────────────────────────────────
   if (isVideo) {
-    if (!req.klingKey) {
-      throw new Error("Kling API key required for video generation");
-    }
+    if (!req.klingKey) throw new Error("Kling API key required for video generation");
+
     const kling = new KlingClient(req.klingKey);
     const aspectRatio = req.aspectRatio ?? getAspectRatioForFormat(req.format, req.platform);
-    const duration = req.format === "long_video" ? 60 : req.format === "short" ? 60 : 30;
+    const duration = req.format === "long_video" ? 10 : 5;
 
     const result = await kling.generateVideo({
       prompt: req.promptText,
@@ -85,51 +60,46 @@ export async function startAiGeneration(
     return { provider: "kling", jobId: result.jobId, type: "video" };
   }
 
+  // ── IMAGE: Nano Banana ──────────────────────────────────────────────────
   if (isImage) {
-    if (!req.nanoBananaKey) {
-      throw new Error("Nano Banana API key required for image generation");
-    }
+    if (!req.nanoBananaKey) throw new Error("Nano Banana API key required for image generation");
+
     const nb = new NanoBananaClient(req.nanoBananaKey);
+    const aspectRatio = req.aspectRatio ?? getAspectRatioForFormat(req.format, req.platform);
+
     const result = await nb.generateImage({
       prompt: req.promptText,
-      width: req.format === "story" ? 1080 : 1080,
-      height: req.format === "story" ? 1920 : req.format === "image" ? 1080 : 1350,
+      aspectRatio,
+      resolution: "1K",
     });
 
-    return { provider: "nano_banana", jobId: result.jobId, type: "image" };
+    return { provider: "nano_banana", jobId: result.jobId || `sync_${Date.now()}`, type: "image" };
   }
 
-  // Text/copy only
-  if (!req.nanoBananaKey) {
-    throw new Error("Nano Banana API key required for copy generation");
-  }
-  const nb = new NanoBananaClient(req.nanoBananaKey);
-  const result = await nb.generateCopy({
-    prompt: req.promptText,
-    platform: req.platform,
-    tone: req.tone,
-    language: req.language,
-    useHashtags: req.useHashtags,
-    useEmojis: req.useEmojis,
-  });
-
-  return { provider: "nano_banana", jobId: result.jobId, type: "copy" };
+  // ── TEXT ONLY: no external generation needed ────────────────────────────
+  // Copy is handled by OpenAI in /api/ai/script — this path should rarely be hit
+  return { provider: "nano_banana", jobId: `text_${Date.now()}`, type: "copy" };
 }
 
 export async function pollJobStatus(
   ref: AiGenerationJobRef,
   nanoBananaKey?: string,
   klingKey?: string,
-  platformData?: { referenceImageUrl?: string; jobType?: string }
+  _platformData?: { referenceImageUrl?: string; jobType?: string }
 ) {
   if (ref.provider === "kling" && klingKey) {
     const kling = new KlingClient(klingKey);
-    const isImg2Vid = !!platformData?.referenceImageUrl;
-    return kling.getJobStatus(ref.jobId, isImg2Vid);
+    return kling.getJobStatus(ref.jobId);
   }
+
   if (ref.provider === "nano_banana" && nanoBananaKey) {
+    // Sync jobs have a special prefix — return immediately as completed
+    if (ref.jobId.startsWith("sync_") || ref.jobId.startsWith("text_")) {
+      return { jobId: ref.jobId, status: "completed" as const };
+    }
     const nb = new NanoBananaClient(nanoBananaKey);
     return nb.getJobStatus(ref.jobId);
   }
+
   throw new Error("No API key available for provider: " + ref.provider);
 }

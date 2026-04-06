@@ -3,6 +3,10 @@
 export interface NanoBananaGenerateImageRequest {
   prompt: string;
   negativePrompt?: string;
+  resolution?: "1K" | "2K" | "4K";
+  aspectRatio?: "1:1" | "9:16" | "16:9" | "4:3" | "3:4";
+  imageUrls?: string[];
+  // legacy fields kept for compat
   width?: number;
   height?: number;
   steps?: number;
@@ -77,14 +81,25 @@ export class NanoBananaClient {
   }
 
   async generateImage(req: NanoBananaGenerateImageRequest): Promise<NanoBananaResult> {
-    const payload = {
+    // Compute aspect_ratio: prefer explicit field, fall back to width/height ratio
+    const aspectRatio = req.aspectRatio
+      ?? (req.height && req.width
+        ? req.height > req.width ? "9:16" : req.width > req.height ? "16:9" : "1:1"
+        : "1:1");
+
+    const payload: Record<string, unknown> = {
       model: "nano-banana-pro",
       prompt: req.prompt,
-      resolution: "1K", // "2K" or "4K" could be used based on config
-      aspect_ratio: req.height && req.width 
-        ? req.height > req.width ? "9:16" : req.width > req.height ? "16:9" : "1:1"
-        : "1:1"
+      resolution: req.resolution ?? "1K",
+      aspect_ratio: aspectRatio,
     };
+
+    if (req.imageUrls?.length) {
+      payload.type = "image-to-image";
+      payload.image_urls = req.imageUrls;
+    } else {
+      payload.type = "text-to-image";
+    }
 
     const res = await this.request<BananaResponse>("/images/generate", payload);
     
