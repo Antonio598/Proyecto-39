@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/utils/errors";
 import { createRuleSchema } from "@/lib/validations/automation.schema";
@@ -7,7 +7,7 @@ import { createRuleSchema } from "@/lib/validations/automation.schema";
 export async function GET(request: Request) {
   try {
     const { workspaceId } = await requireWorkspaceAccess(request);
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data, error } = await supabase
       .from("posting_rules")
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { session, workspaceId } = await requireWorkspaceAccess(request);
-    const supabase = await createClient();
+    const admin = createAdminClient();
     const body = await request.json();
 
     const parsed = createRuleSchema.safeParse(body);
@@ -35,7 +35,10 @@ export async function POST(request: Request) {
 
     const { socialAccountId, name, postsPerDay, postsPerWeek, allowedDays, timeSlots, formats, publishMode, aiPromptId } = parsed.data;
 
-    const { data, error } = await supabase
+    // aiSettings comes from the form but is not part of the validation schema — stored as jsonb
+    const aiSettings = (body.aiSettings as Record<string, unknown>) ?? {};
+
+    const { data, error } = await admin
       .from("posting_rules")
       .insert({
         workspace_id: workspaceId,
@@ -48,6 +51,7 @@ export async function POST(request: Request) {
         formats,
         publish_mode: publishMode,
         ai_prompt_id: aiPromptId ?? null,
+        ai_settings: aiSettings,
         is_active: true,
       })
       .select("*, social_account:social_accounts(*)")
@@ -55,7 +59,7 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    await supabase.from("activity_logs").insert({
+    await admin.from("activity_logs").insert({
       workspace_id: workspaceId,
       user_id: session.user.id,
       action: "rule.created",

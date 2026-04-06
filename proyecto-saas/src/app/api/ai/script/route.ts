@@ -25,14 +25,14 @@ export async function POST(request: Request) {
 
     const admin = createAdminClient();
 
-    // Get workspace keys and brand context
-    const [workspaceRes, brandRes] = await Promise.all([
-      admin.from("workspaces").select("metadata").eq("id", workspaceId).single(),
-      admin.from("brand_settings").select("ai_context").eq("workspace_id", workspaceId).maybeSingle(),
-    ]);
+    // Read keys and brand context from brand_settings
+    const { data: brand } = await admin
+      .from("brand_settings")
+      .select("openai_key, ai_context")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
 
-    const meta = (workspaceRes.data?.metadata as Record<string, string>) ?? {};
-    const openaiKey = meta.openai_key;
+    const openaiKey = brand?.openai_key;
 
     if (!openaiKey) {
       throw new ApiError(
@@ -52,10 +52,10 @@ export async function POST(request: Request) {
       language,
       useHashtags,
       useEmojis,
-      brandContext: brandRes.data?.ai_context ?? undefined,
+      brandContext: brand?.ai_context ?? undefined,
     });
 
-    // Create the generated_posts record now with the caption/hashtags
+    // Create the generated_posts record with caption/hashtags
     const { data: post, error: insertError } = await admin
       .from("generated_posts")
       .insert({

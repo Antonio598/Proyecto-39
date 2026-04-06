@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { pollJobStatus } from "@/lib/ai/orchestrator";
 import { handleApiError } from "@/lib/utils/errors";
@@ -11,10 +11,10 @@ export async function GET(
   try {
     const { workspaceId } = await requireWorkspaceAccess(request);
     const { jobId } = await params;
-    const supabase = await createClient();
+    const admin = createAdminClient();
 
     // Get the generated post record to find provider
-    const { data: post } = await supabase
+    const { data: post } = await admin
       .from("generated_posts")
       .select("*")
       .eq("workspace_id", workspaceId)
@@ -41,14 +41,12 @@ export async function GET(
       });
     }
 
-    // Get workspace AI keys
-    const { data: workspace } = await supabase
-      .from("workspaces")
-      .select("metadata")
-      .eq("id", workspaceId)
-      .single();
-
-    const meta = (workspace?.metadata as Record<string, string>) ?? {};
+    // Get AI keys from brand_settings
+    const { data: brand } = await admin
+      .from("brand_settings")
+      .select("nano_banana_key, kling_key")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
 
     const jobStatus = await pollJobStatus(
       {
@@ -56,8 +54,8 @@ export async function GET(
         jobId,
         type: "image",
       },
-      meta.nano_banana_key,
-      meta.kling_key
+      brand?.nano_banana_key ?? undefined,
+      brand?.kling_key ?? undefined
     );
 
     // If completed, update the DB record
@@ -77,7 +75,7 @@ export async function GET(
       }
 
       if (Object.keys(updates).length > 0) {
-        await supabase
+        await admin
           .from("generated_posts")
           .update(updates)
           .eq("id", post.id);

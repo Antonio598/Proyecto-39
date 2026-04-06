@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/utils/errors";
@@ -7,22 +6,31 @@ import { handleApiError } from "@/lib/utils/errors";
 export async function GET(request: Request) {
   try {
     const { workspaceId } = await requireWorkspaceAccess(request);
-    const supabase = await createClient();
-    const adminSupabase = createAdminClient();
+    const admin = createAdminClient();
 
-    const [brandRes, wsRes] = await Promise.all([
-      supabase.from("brand_settings").select("*").eq("workspace_id", workspaceId).single(),
-      adminSupabase.from("workspaces").select("metadata").eq("id", workspaceId).single(),
-    ]);
-
-    const meta = (wsRes.data?.metadata as Record<string, string>) ?? {};
+    const { data } = await admin
+      .from("brand_settings")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
 
     return NextResponse.json({
-      data: brandRes.data,
+      data: data
+        ? {
+            primary_color: data.primary_color,
+            secondary_color: data.secondary_color,
+            font_primary: data.font_primary,
+            tone_of_voice: data.tone_of_voice,
+            niche: data.niche,
+            guidelines: data.guidelines,
+            ai_context: data.ai_context,
+            updated_at: data.updated_at,
+          }
+        : null,
       keys: {
-        hasOpenaiKey: !!meta.openai_key,
-        hasNanoBananaKey: !!meta.nano_banana_key,
-        hasKlingKey: !!meta.kling_key,
+        hasOpenaiKey: !!data?.openai_key,
+        hasNanoBananaKey: !!data?.nano_banana_key,
+        hasKlingKey: !!data?.kling_key,
       },
     });
   } catch (error) {
@@ -34,53 +42,39 @@ export async function POST(request: Request) {
   try {
     const { workspaceId } = await requireWorkspaceAccess(request);
     const body = await request.json();
-    const supabase = await createClient();
-    const adminSupabase = createAdminClient();
+    const admin = createAdminClient();
 
     const {
       primaryColor, secondaryColor, fontPrimary, toneOfVoice,
       niche, guidelines, aiContext, nanoBananaKey, klingKey, openaiKey,
     } = body;
 
-    // Update brand settings
-    const { data, error } = await supabase
+    // Build update payload — only include key fields when the user actually typed something
+    const upsertPayload: Record<string, unknown> = {
+      workspace_id: workspaceId,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (primaryColor !== undefined) upsertPayload.primary_color = primaryColor;
+    if (secondaryColor !== undefined) upsertPayload.secondary_color = secondaryColor;
+    if (fontPrimary !== undefined) upsertPayload.font_primary = fontPrimary;
+    if (toneOfVoice !== undefined) upsertPayload.tone_of_voice = toneOfVoice;
+    if (niche !== undefined) upsertPayload.niche = niche || null;
+    if (guidelines !== undefined) upsertPayload.guidelines = guidelines || null;
+    if (aiContext !== undefined) upsertPayload.ai_context = aiContext || null;
+
+    // Only overwrite keys when a non-empty value is provided
+    if (openaiKey?.trim()) upsertPayload.openai_key = openaiKey.trim();
+    if (nanoBananaKey?.trim()) upsertPayload.nano_banana_key = nanoBananaKey.trim();
+    if (klingKey?.trim()) upsertPayload.kling_key = klingKey.trim();
+
+    const { data, error } = await admin
       .from("brand_settings")
-      .upsert({
-        workspace_id: workspaceId,
-        primary_color: primaryColor,
-        secondary_color: secondaryColor,
-        font_primary: fontPrimary,
-        tone_of_voice: toneOfVoice,
-        niche: niche || null,
-        guidelines: guidelines || null,
-        ai_context: aiContext || null,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "workspace_id" })
+      .upsert(upsertPayload, { onConflict: "workspace_id" })
       .select()
       .single();
 
     if (error) throw error;
-
-    // Store API keys in workspace metadata (using admin client)
-    if (nanoBananaKey || klingKey || openaiKey) {
-      const { data: ws } = await adminSupabase
-        .from("workspaces")
-        .select("metadata")
-        .eq("id", workspaceId)
-        .single();
-
-      const currentMeta = (ws?.metadata as Record<string, string>) ?? {};
-      const updatedMeta: Record<string, string> = { ...currentMeta };
-
-      if (nanoBananaKey) updatedMeta.nano_banana_key = nanoBananaKey;
-      if (klingKey) updatedMeta.kling_key = klingKey;
-      if (openaiKey) updatedMeta.openai_key = openaiKey;
-
-      await adminSupabase
-        .from("workspaces")
-        .update({ metadata: updatedMeta })
-        .eq("id", workspaceId);
-    }
 
     return NextResponse.json({ data });
   } catch (error) {

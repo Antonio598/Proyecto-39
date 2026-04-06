@@ -17,8 +17,8 @@ export async function POST(request: Request) {
       language = "es",
       useHashtags = true,
       useEmojis = true,
-      referenceImageUrl,   // optional: image URL to use as base for video
-      postId,              // optional: existing generated_posts record to update
+      referenceImageUrl,
+      postId,
     } = body;
 
     if (!format || !platform || !promptText) {
@@ -27,15 +27,15 @@ export async function POST(request: Request) {
 
     const admin = createAdminClient();
 
-    // Get workspace keys and brand context
-    const [workspaceRes, brandRes] = await Promise.all([
-      admin.from("workspaces").select("metadata").eq("id", workspaceId).single(),
-      admin.from("brand_settings").select("ai_context").eq("workspace_id", workspaceId).maybeSingle(),
-    ]);
+    // Read keys and brand context from brand_settings
+    const { data: brand } = await admin
+      .from("brand_settings")
+      .select("openai_key, nano_banana_key, kling_key, ai_context")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
 
-    const meta = (workspaceRes.data?.metadata as Record<string, string>) ?? {};
-    const nanoBananaKey = meta.nano_banana_key;
-    const klingKey = meta.kling_key;
+    const nanoBananaKey = brand?.nano_banana_key ?? undefined;
+    const klingKey = brand?.kling_key ?? undefined;
 
     const isVideo = ["reel", "short", "long_video"].includes(format);
 
@@ -55,7 +55,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Start AI generation job
     const jobRef = await startAiGeneration({
       format,
       platform,
@@ -65,29 +64,23 @@ export async function POST(request: Request) {
       useHashtags,
       useEmojis,
       referenceImageUrl,
-      brandContext: brandRes.data?.ai_context ?? undefined,
+      brandContext: brand?.ai_context ?? undefined,
       nanoBananaKey,
       klingKey,
     });
 
-    // Update existing post or create new one
     let finalPostId = postId;
 
     if (postId) {
-      // Update existing post record with new job info
       await admin
         .from("generated_posts")
         .update({
           ai_job_id: jobRef.jobId,
           ai_provider: jobRef.provider,
-          platform_data: {
-            referenceImageUrl,
-            jobType: jobRef.type,
-          },
+          platform_data: { referenceImageUrl, jobType: jobRef.type },
         })
         .eq("id", postId);
     } else {
-      // Create new post record
       const { data: newPost, error: insertError } = await admin
         .from("generated_posts")
         .insert({
