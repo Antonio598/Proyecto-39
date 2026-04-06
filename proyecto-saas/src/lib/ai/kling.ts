@@ -55,6 +55,8 @@ export class KlingClient {
       input,
     };
 
+    console.log("[Kling] generate request:", JSON.stringify(body));
+
     const res = await fetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
       headers: this.headers,
@@ -62,17 +64,19 @@ export class KlingClient {
       cache: "no-store",
     });
 
+    const raw = await res.json().catch(() => ({})) as Record<string, unknown>;
+    console.log("[Kling] generate response status:", res.status, JSON.stringify(raw));
+
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      const msg = (err as { message?: string; error?: string; data?: { message?: string } })
-        .message ??
-        (err as { data?: { message?: string } }).data?.message ??
-        (err as { error?: string }).error ??
+      const msg =
+        (raw.message as string) ??
+        ((raw.data as Record<string, unknown>)?.message as string) ??
+        (raw.error as string) ??
         res.statusText;
       throw new Error(`Kling API error (${res.status}): ${msg}`);
     }
 
-    const data = await res.json() as {
+    const data = raw as {
       code?: number;
       message?: string;
       data?: { task_id?: string; status?: string };
@@ -84,50 +88,41 @@ export class KlingClient {
       throw new Error(`Kling API: no task_id in response — ${JSON.stringify(data)}`);
     }
 
+    console.log("[Kling] task created:", taskId);
     return { jobId: taskId, status: "pending" };
   }
 
   async getJobStatus(jobId: string): Promise<KlingJobResult> {
-    const res = await fetch(`${this.baseUrl}/api/status?task_id=${encodeURIComponent(jobId)}`, {
-      headers: this.headers,
-      cache: "no-store",
-    });
+    const url = `${this.baseUrl}/api/status?task_id=${encodeURIComponent(jobId)}`;
+    const res = await fetch(url, { headers: this.headers, cache: "no-store" });
+
+    const raw = await res.json().catch(() => ({})) as Record<string, unknown>;
+    console.log(`[Kling] status ${url} → ${res.status}`, JSON.stringify(raw));
 
     if (!res.ok) {
-      return { jobId, status: "failed", error: `HTTP ${res.status}` };
+      // Return processing so the frontend keeps polling instead of giving up
+      return { jobId, status: "processing", error: `HTTP ${res.status}` };
     }
 
-    const data = await res.json() as {
-      code?: number;
-      message?: string;
-      data?: {
-        task_id?: string;
-        status?: string;
-        response?: string[];
-        video_url?: string;
-        output?: { video_url?: string };
-      };
-      status?: string;
-      response?: string[];
-    };
+    const task = (raw.data ?? raw) as Record<string, unknown>;
+    const rawStatus = ((task.status as string) ?? "").toLowerCase();
 
-    const task = data.data ?? data;
-    const rawStatus = ((task as { status?: string }).status ?? "").toLowerCase();
+    // Response array may contain the video URL directly
+    const responseArr = task.response as string[] | undefined;
+    const videoUrl: string | undefined =
+      (task.video_url as string | undefined) ??
+      ((task.output as Record<string, unknown> | undefined)?.video_url as string | undefined) ??
+      (Array.isArray(responseArr) && responseArr.length > 0 ? responseArr[0] : undefined) ??
+      (raw.video_url as string | undefined);
 
     const status: KlingJobResult["status"] =
-      rawStatus === "completed" || rawStatus === "success" || rawStatus === "succeed"
+      videoUrl || ["completed", "success", "succeed", "done"].includes(rawStatus)
         ? "completed"
-        : rawStatus === "failed" || rawStatus === "error"
+        : ["failed", "error"].includes(rawStatus)
         ? "failed"
         : "processing";
 
-    // Extract video URL from various possible response shapes
-    const responseArr = (task as { response?: string[] }).response;
-    const videoUrl: string | undefined =
-      (task as { video_url?: string }).video_url ??
-      (task as { output?: { video_url?: string } }).output?.video_url ??
-      (Array.isArray(responseArr) && responseArr.length > 0 ? responseArr[0] : undefined);
-
+    console.log(`[Kling] jobId=${jobId} rawStatus=${rawStatus} videoUrl=${videoUrl} → ${status}`);
     return { jobId, status, videoUrl };
   }
 }

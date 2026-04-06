@@ -4,6 +4,8 @@ import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { pollJobStatus } from "@/lib/ai/orchestrator";
 import { handleApiError } from "@/lib/utils/errors";
 
+export const maxDuration = 60;
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ jobId: string }> }

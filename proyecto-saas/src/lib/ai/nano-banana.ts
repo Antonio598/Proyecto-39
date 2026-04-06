@@ -1,4 +1,4 @@
-// Nano Banana API client — keys are stored per workspace in brand_settings or workspace metadata
+// Nano Banana Pro API — https://gateway.bananapro.site
 
 export interface NanoBananaGenerateImageRequest {
   prompt: string;
@@ -6,84 +6,42 @@ export interface NanoBananaGenerateImageRequest {
   resolution?: "1K" | "2K" | "4K";
   aspectRatio?: "1:1" | "9:16" | "16:9" | "4:3" | "3:4";
   imageUrls?: string[];
-  // legacy fields kept for compat
   width?: number;
   height?: number;
-  steps?: number;
-  cfgScale?: number;
-  style?: string;
-}
-
-export interface NanoBananaGenerateCopyRequest {
-  prompt: string;
-  platform: string;
-  tone?: string;
-  language?: string;
-  useHashtags?: boolean;
-  useEmojis?: boolean;
-  maxLength?: number;
 }
 
 export interface NanoBananaResult {
   jobId: string;
   status: "pending" | "processing" | "completed" | "failed";
   imageUrl?: string;
-  caption?: string;
-  hashtags?: string[];
   error?: string;
 }
 
-interface BananaResponse {
-  task_id?: string;
-  data?: {
-    task_id?: string;
-    status?: string;
-    output?: {
-      primary_url?: string;
-      images?: { url?: string }[];
-    };
-    error_message?: string;
-  };
-  status?: string;
-  output?: {
-    primary_url?: string;
-    images?: { url?: string }[];
-  };
-  error_message?: string;
-}
+// Loose type — we log the raw response so we can learn the real shape
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyJson = any;
 
 export class NanoBananaClient {
   private apiKey: string;
   private baseUrl: string;
 
-  constructor(apiKey: string, baseUrl?: string) {
+  constructor(apiKey: string) {
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl ?? "https://gateway.bananapro.site/api/v1";
+    this.baseUrl = "https://gateway.bananapro.site/api/v1";
   }
 
-  private async request<T>(path: string, body?: unknown, method = "POST"): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ message: "Unknown error" }));
-      throw new Error(`Nano Banana API error: ${err.message ?? err.error?.message ?? res.statusText}`);
-    }
-
-    return res.json();
+  private get headers() {
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${this.apiKey}`,
+    };
   }
 
+  /** POST /images/generate — returns task_id OR image_url if sync */
   async generateImage(req: NanoBananaGenerateImageRequest): Promise<NanoBananaResult> {
-    // Compute aspect_ratio: prefer explicit field, fall back to width/height ratio
-    const aspectRatio = req.aspectRatio
-      ?? (req.height && req.width
+    const aspectRatio: string =
+      req.aspectRatio ??
+      (req.height && req.width
         ? req.height > req.width ? "9:16" : req.width > req.height ? "16:9" : "1:1"
         : "1:1");
 
@@ -92,49 +50,96 @@ export class NanoBananaClient {
       prompt: req.prompt,
       resolution: req.resolution ?? "1K",
       aspect_ratio: aspectRatio,
+      type: req.imageUrls?.length ? "image-to-image" : "text-to-image",
     };
+    if (req.imageUrls?.length) payload.image_urls = req.imageUrls;
 
-    if (req.imageUrls?.length) {
-      payload.type = "image-to-image";
-      payload.image_urls = req.imageUrls;
-    } else {
-      payload.type = "text-to-image";
+    const res = await fetch(`${this.baseUrl}/images/generate`, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+
+    const raw: AnyJson = await res.json().catch(() => ({}));
+    console.log("[NanaBanana] generate response status:", res.status, JSON.stringify(raw));
+
+    if (!res.ok) {
+      throw new Error(`Nano Banana generate error (${res.status}): ${raw?.message ?? raw?.error ?? res.statusText}`);
     }
 
-    const res = await this.request<BananaResponse>("/images/generate", payload);
-    
-    // Fallback parsing just in case response changes slightly
-    const taskId = res.data?.task_id || res.task_id;
-    
-    return {
-      jobId: taskId || "",
-      status: "pending",
-    };
+    // Extract task_id from various possible locations
+    const taskId: string =
+      raw?.data?.task_id ??
+      raw?.task_id ??
+      raw?.id ??
+      "";
+
+    // Some setups return the image synchronously
+    const imageUrl: string | undefined =
+      raw?.data?.image_url ??
+      raw?.image_url ??
+      raw?.data?.output?.primary_url ??
+      raw?.data?.output?.images?.[0]?.url ??
+      raw?.output?.primary_url ??
+      undefined;
+
+    if (imageUrl) {
+      console.log("[NanoBanana] synchronous image URL:", imageUrl);
+      return { jobId: taskId || `sync_${Date.now()}`, status: "completed", imageUrl };
+    }
+
+    return { jobId: taskId, status: "pending" };
   }
 
-  async generateCopy(_req: NanoBananaGenerateCopyRequest): Promise<NanoBananaResult> {
-    throw new Error("Not implemented (use OpenAI API directly)");
-  }
-
+  /** Poll task status — tries multiple endpoint patterns */
   async getJobStatus(jobId: string): Promise<NanoBananaResult> {
-    const res = await this.request<BananaResponse>(`/images/${jobId}`, undefined, "GET");
-    const task = res.data ?? res;
+    // Try candidate endpoints in order — first success wins
+    const candidates = [
+      `${this.baseUrl}/images/task/${jobId}`,
+      `${this.baseUrl}/tasks/${jobId}`,
+      `${this.baseUrl}/images/${jobId}`,
+      `${this.baseUrl}/generations/${jobId}`,
+    ];
 
-    let mappedStatus: NanoBananaResult["status"] = "pending";
-    if (task.status === "completed" || task.status === "succeed" || task.status === "success") {
-      mappedStatus = "completed";
-    } else if (task.status === "failed") {
-      mappedStatus = "failed";
-    } else if (task.status === "processing" || task.status === "generating") {
-      mappedStatus = "processing";
+    let lastError = "";
+    for (const url of candidates) {
+      const res = await fetch(url, { headers: this.headers, cache: "no-store" });
+      const raw: AnyJson = await res.json().catch(() => ({}));
+      console.log(`[NanoBanana] status ${url} → ${res.status}`, JSON.stringify(raw));
+
+      if (!res.ok) { lastError = `HTTP ${res.status}`; continue; }
+
+      const task = raw?.data ?? raw;
+      const rawStatus: string = (task?.status ?? "").toLowerCase();
+
+      const imageUrl: string | undefined =
+        task?.image_url ??
+        task?.output?.primary_url ??
+        task?.output?.images?.[0]?.url ??
+        task?.output?.url ??
+        task?.result?.image_url ??
+        raw?.image_url ??
+        undefined;
+
+      const status: NanoBananaResult["status"] =
+        imageUrl || ["completed", "success", "succeed", "done"].includes(rawStatus)
+          ? "completed"
+          : ["failed", "error"].includes(rawStatus)
+          ? "failed"
+          : "processing";
+
+      return { jobId, status, imageUrl, error: task?.error_message ?? task?.error ?? undefined };
     }
 
-    return {
-      jobId,
-      status: mappedStatus,
-      imageUrl: task.output?.primary_url ?? task.output?.images?.[0]?.url ?? undefined,
-      error: task.error_message ?? undefined,
-    };
+    // All endpoints failed — return processing so frontend keeps polling
+    console.error("[NanoBanana] all status endpoints failed:", lastError);
+    return { jobId, status: "processing", error: lastError };
   }
 }
 
+// generateCopy is handled by OpenAI — kept for type compatibility
+export interface NanoBananaGenerateCopyRequest {
+  prompt: string;
+  platform: string;
+}

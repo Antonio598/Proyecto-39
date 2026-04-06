@@ -4,6 +4,8 @@ import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { startAiGeneration } from "@/lib/ai/orchestrator";
 import { handleApiError, ApiError } from "@/lib/utils/errors";
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const { session, workspaceId } = await requireWorkspaceAccess(request);
