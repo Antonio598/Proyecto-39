@@ -77,7 +77,7 @@ async function pollJobUntilDone(
   workspaceId: string,
   maxSeconds = 600,
   onTick?: (elapsed: number) => void,
-): Promise<{ mediaUrls?: string[]; caption?: string; hashtags?: string[] } | null> {
+): Promise<{ mediaUrls?: string[]; caption?: string; hashtags?: string[]; error?: string } | null> {
   const interval = 5000; // 5 seconds between polls
   const maxAttempts = Math.floor((maxSeconds * 1000) / interval);
   let elapsed = 0;
@@ -92,7 +92,7 @@ async function pollJobUntilDone(
     const json = await res.json();
     const data = json.data;
     if (data?.status === "completed") return data.result ?? null;
-    if (data?.status === "failed") return null;
+    if (data?.status === "failed") return { error: data.error ?? "La generación falló" };
   }
   return null;
 }
@@ -245,7 +245,7 @@ export default function AiCreatePage() {
               promptText: script.imagePrompt,
               tone,
               language,
-              postId: script.postId,
+              // Do NOT pass postId for image — creates its own DB record to avoid conflict with video job
             }),
           });
 
@@ -266,7 +266,7 @@ export default function AiCreatePage() {
               setStep("image", "done");
               toast.success("Imagen generada ✓");
             } else {
-              setStep("image", "error", "Nano Banana no respondió (revisa tu API key en Integraciones)");
+              setStep("image", "error", imgResult?.error ?? "Nano Banana: tiempo de espera agotado");
             }
           }
         } else {
@@ -314,7 +314,7 @@ export default function AiCreatePage() {
             setStep("video", "done");
             toast.success("Video generado ✓");
           } else {
-            setStep("video", "error", "Kling no respondió (revisa tu API key en Integraciones)");
+            setStep("video", "error", videoResult?.error ?? "Kling: tiempo de espera agotado");
           }
         }
       } else if (isVideo && skipVideo) {
