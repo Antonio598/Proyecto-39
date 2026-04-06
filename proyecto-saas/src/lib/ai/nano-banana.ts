@@ -35,7 +35,7 @@ export class NanoBananaClient {
 
   constructor(apiKey: string, baseUrl?: string) {
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl ?? "https://api.nanabanana.ai/v1";
+    this.baseUrl = baseUrl ?? "https://api.nanobananaapi.ai/v1";
   }
 
   private async request<T>(path: string, body: unknown): Promise<T> {
@@ -71,3 +71,4 @@ export class NanoBananaClient {
     return res.json();
   }
 }
+

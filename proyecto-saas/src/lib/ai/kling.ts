@@ -1,4 +1,5 @@
 // Kling API client — for video generation (Reels, Shorts, long videos)
+import crypto from "crypto";
 
 export interface KlingGenerateVideoRequest {
   prompt: string;
@@ -29,9 +30,36 @@ export class KlingClient {
   }
 
   private get headers() {
+    let ak = this.apiKey;
+    let sk = "";
+    if (this.apiKey.includes(":")) {
+      [ak, sk] = this.apiKey.split(":", 2);
+    } else if (this.apiKey.includes(",")) {
+      [ak, sk] = this.apiKey.split(",", 2);
+    } else {
+      // Missing SK, fallback to trying raw key or erroring
+      sk = ak;
+    }
+
+    const header = { alg: "HS256", typ: "JWT" };
+    const nbf = Math.floor(Date.now() / 1000) - 5;
+    const exp = nbf + 1805;
+    const payload = { iss: ak, nbf, exp };
+
+    const base64UrlEncode = (obj: any) =>
+      Buffer.from(JSON.stringify(obj)).toString("base64url");
+
+    const unsignedToken = `${base64UrlEncode(header)}.${base64UrlEncode(payload)}`;
+    const signature = crypto
+      .createHmac("sha256", sk)
+      .update(unsignedToken)
+      .digest("base64url");
+
+    const token = `${unsignedToken}.${signature}`;
+
     return {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${this.apiKey}`,
+      Authorization: `Bearer ${token}`,
     };
   }
 

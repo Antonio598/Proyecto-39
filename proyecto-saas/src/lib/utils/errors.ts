@@ -22,8 +22,8 @@ export function handleApiError(error: unknown): NextResponse {
   console.error("[API Error]", error);
 
   return NextResponse.json(
-    { error: "Internal server error" },
-    { status: 500 }
+    { error: error instanceof Error ? error.message : "Internal server error" },
+    { status: error instanceof Error && 'status' in error ? (error as any).status : 500 }
   );
 }
 
