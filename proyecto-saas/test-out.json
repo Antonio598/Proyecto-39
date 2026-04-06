@@ -1,0 +1,58 @@
+[
+  {
+    "id": "3d2f5ea8-1549-4aca-8c49-f0c5d52aa53a",
+    "workspace_id": "9d839025-bbdb-4d23-a385-1557a8b8f53c",
+    "created_by": "5cf83637-7ab6-4b66-af8f-58cfe2d1eb0f",
+    "format": "reel",
+    "caption": "🌞 ¡El clima perfecto para sonreír! 😄 ¿Sabías que un día soleado puede mejorar tu estado de ánimo y aumentar tu productividad? ☀️✨ Además, es la oportunidad ideal para disfrutar al aire libre y conectar con la naturaleza. 🌳❤️ ¡Cuéntanos, cuál es tu actividad favorita bajo el sol! ☀️ #ClimaPerfecto #BeneficiosDelSol #VidaSaludable #EnergíaPositiva #Naturaleza #Bienestar #Sonríe #AventurasAlAireLibre #DíasSoleados",
+    "hashtags": [
+      "clima",
+      "beneficios",
+      "sol",
+      "bienestar",
+      "naturaleza",
+      "vida",
+      "salud",
+      "felicidad",
+      "airelibre",
+      "energía"
+    ],
+    "media_urls": [],
+    "asset_ids": [],
+    "platform_data": {
+      "jobType": "video"
+    },
+    "ai_prompt_id": null,
+    "ai_job_id": "n75bee9c185719f485dabfd46c8b3fd2e64kling3",
+    "ai_provider": "kling",
+    "created_at": "2026-04-06T06:14:06.710045+00:00"
+  },
+  {
+    "id": "f7c01307-5be0-4488-9a02-3c6a98a51569",
+    "workspace_id": "9d839025-bbdb-4d23-a385-1557a8b8f53c",
+    "created_by": "5cf83637-7ab6-4b66-af8f-58cfe2d1eb0f",
+    "format": "reel",
+    "caption": "🔥 ¡La batalla contra el calor ha comenzado! 💪💨 Mira cómo reparamos este aire acondicionado en tiempo récord y devolvemos la frescura a este hogar. 🏡❄️ No dejes que el calor te derrote, ¡aquí te enseñamos cómo hacerlo! 👨‍🔧💥 #ReparaciónDeClimas #VeranoFresco #HogarFeliz #TipsDeReparación #DíaDeCalor",
+    "hashtags": [
+      "ReparaciónDeClimas",
+      "VeranoFresco",
+      "HogarFeliz",
+      "ConsejosPrácticos",
+      "AireAcondicionado",
+      "Calor",
+      "Verano2023",
+      "DIY",
+      "Reparaciones",
+      "Frescura"
+    ],
+    "media_urls": [],
+    "asset_ids": [],
+    "platform_data": {
+      "jobType": "video"
+    },
+    "ai_prompt_id": null,
+    "ai_job_id": "n75f7dc2543c18042f99420d1ec6650f3f9kling3",
+    "ai_provider": "kling",
+    "created_at": "2026-04-06T06:08:25.628483+00:00"
+  }
+]

@@ -70,10 +70,9 @@ export async function startAiGeneration(
     const result = await nb.generateImage({
       prompt: req.promptText,
       aspectRatio,
-      resolution: "1K",
     });
 
-    return { provider: "nano_banana", jobId: result.jobId || `sync_${Date.now()}`, type: "image" };
+    return { provider: "nano_banana", jobId: result.jobId, type: "image" };
   }
 
   // ── TEXT ONLY: no external generation needed ────────────────────────────
