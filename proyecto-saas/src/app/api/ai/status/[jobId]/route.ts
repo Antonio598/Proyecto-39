@@ -27,8 +27,8 @@ export async function GET(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    // If already completed (has media_urls or caption), return cached result
-    if (post.media_urls?.length > 0 || post.caption) {
+    // If already completed (has actual media), return cached result
+    if (post.media_urls?.length > 0) {
       return NextResponse.json({
         data: {
           status: "completed",
