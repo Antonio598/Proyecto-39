@@ -44,29 +44,28 @@ export class KlingClient {
       : [];
 
     const hasImages = imageUrls.length > 0;
-    const taskType = hasImages ? "image_to_video" : "text_to_video";
 
     const input: Record<string, unknown> = {
       prompt: req.prompt,
       duration: req.duration ?? 5,
       aspect_ratio: req.aspectRatio ?? "9:16",
       mode: "std",
+      version: "2.6",
       cfg_scale: 0.5,
     };
 
     if (req.negativePrompt) input.negative_prompt = req.negativePrompt;
 
-    if (imageUrls.length === 1) {
-      input.image_url = imageUrls[0];
-    } else if (imageUrls.length > 1) {
-      // Some Kling wrappers accept images array for multi-frame story video
-      input.image_url = imageUrls[0]; // always set first as primary
-      input.images = imageUrls;       // full array for wrappers that support it
+    // image_url in input tells the API to use image-to-video mode automatically
+    if (hasImages) {
+      input.image_url = imageUrls[0]; // primary frame
+      if (imageUrls.length > 1) input.images = imageUrls; // story frames
     }
 
+    // task_type is always "video_generation" — the API infers text/image mode from input
     const body = {
       model: "kling",
-      task_type: taskType,
+      task_type: "video_generation",
       input,
     };
 

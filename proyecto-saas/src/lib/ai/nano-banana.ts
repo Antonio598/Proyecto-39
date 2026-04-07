@@ -55,7 +55,7 @@ export class NanoBananaClient {
       req.aspectRatio ?? this.aspectRatioFromDimensions(req.width, req.height);
 
     const payload: Record<string, unknown> = {
-      model: "nano-banana", // the cheaper/faster model per docs
+      model: "nano-banana-pro",
       prompt: req.prompt,
       aspect_ratio: aspectRatio,
     };
