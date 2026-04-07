@@ -334,7 +334,8 @@ export default function AiCreatePage() {
             setStep("video", "done");
             toast.success("Video generado ✓");
           } else {
-            setStep("video", "error", "Kling: tiempo de espera agotado. Revisa tu API key.");
+            const errMsg = videoResult?.error ?? "Kling: tiempo de espera agotado";
+            setStep("video", "error", errMsg);
           }
         }
       } else if (isVideo && skipVideo) {

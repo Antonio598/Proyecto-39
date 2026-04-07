@@ -107,7 +107,20 @@ export class KlingClient {
     console.log("[Kling] status →", res.status, JSON.stringify(raw));
 
     if (!res.ok) {
+      // Auth errors — fail immediately, don't keep polling
+      if (res.status === 401 || res.status === 403) {
+        return { jobId, status: "failed", error: `Kling: API key inválida (HTTP ${res.status})` };
+      }
       return { jobId, status: "processing", error: `HTTP ${res.status}` };
+    }
+
+    // Some APIs return 200 with error code inside
+    const code = raw.code as number | undefined;
+    if (code !== undefined && code !== 0 && code !== 200) {
+      const msg = (raw.message ?? raw.error ?? `code ${code}`) as string;
+      if (code === 401 || code === 403 || msg.toLowerCase().includes("key") || msg.toLowerCase().includes("auth")) {
+        return { jobId, status: "failed", error: `Kling: ${msg}` };
+      }
     }
 
     const data = (raw.data ?? raw) as Record<string, unknown>;
