@@ -208,13 +208,15 @@ export default function AiCreatePage() {
     if (!selectedAccountId) { toast.error("Selecciona una cuenta de destino"); return; }
     setScheduling(true);
     try {
+      // Schedule 1 minute in the past so the cron picks it up on the next run
+      const publishAt = new Date(Date.now() - 60 * 1000).toISOString();
       const res = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
         body: JSON.stringify({
           socialAccountId: selectedAccountId,
           generatedPostId: finalResult.postId,
-          scheduledAt: new Date().toISOString(),
+          scheduledAt: publishAt,
           publishMode: "auto",
         }),
       });

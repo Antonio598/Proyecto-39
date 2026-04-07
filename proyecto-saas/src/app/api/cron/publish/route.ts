@@ -13,15 +13,17 @@ export async function GET(request: Request) {
 
   const supabase = createAdminClient();
   const now = new Date();
-  const twoMinutesAhead = new Date(now.getTime() + 2 * 60 * 1000);
+  const fiveMinutesAhead = new Date(now.getTime() + 5 * 60 * 1000);
+  // Also pick up posts that were missed (up to 24 hours ago)
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  // Find posts due to publish in the next 2 minutes that are approved
+  // Find posts due to publish: either overdue (missed) or due in the next 5 minutes
   const { data: posts, error } = await supabase
     .from("scheduled_posts")
     .select("*, generated_post:generated_posts(*), social_account:social_accounts(*)")
     .in("status", ["approved", "scheduled"])
-    .lte("scheduled_at", twoMinutesAhead.toISOString())
-    .gte("scheduled_at", now.toISOString())
+    .lte("scheduled_at", fiveMinutesAhead.toISOString())
+    .gte("scheduled_at", oneDayAgo.toISOString())
     .lt("retry_count", 3);
 
   if (error) {
