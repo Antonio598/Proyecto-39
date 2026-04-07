@@ -38,18 +38,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ endpoint: statusUrl, httpStatus: res.status, raw });
     }
 
-    // Create a minimal test task (text-to-video, 3s, smallest possible)
+    // Create a minimal test task (text-to-video, 3s, cheapest type)
     const generateBody = {
-      model: "kling",
-      task_type: "video_generation",
-      input: {
-        prompt: "a simple white background",
-        duration: 3,
-        aspect_ratio: "1:1",
-        mode: "std",
-        version: "2.6",
-        cfg_scale: 0.5,
-      },
+      type: "std-text-to-video",
+      prompt: "a simple white background",
+      duration: 3,
+      aspect_ratio: "1:1",
+      sound: false,
+      cfg_scale: 0.5,
     };
 
     const genRes = await fetch(`${BASE_URL}/api/generate`, {
