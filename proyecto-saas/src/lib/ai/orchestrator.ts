@@ -11,6 +11,7 @@ export interface AiGenerationRequest {
   useHashtags?: boolean;
   useEmojis?: boolean;
   aspectRatio?: "9:16" | "16:9" | "1:1";
+  sound?: boolean;
   referenceImageUrl?: string;    // single image
   referenceImageUrls?: string[]; // multiple images for story video
   brandContext?: string;
@@ -55,6 +56,7 @@ export async function startAiGeneration(
       prompt: req.promptText,
       aspectRatio,
       duration,
+      sound: req.sound,
       referenceImageUrl: req.referenceImageUrl,
       referenceImageUrls: req.referenceImageUrls,
     });

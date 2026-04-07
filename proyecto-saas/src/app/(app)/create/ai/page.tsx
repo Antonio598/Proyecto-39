@@ -5,7 +5,8 @@ import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useQuery } from "@tanstack/react-query";
 import {
   Sparkles, Loader2, CheckCircle, AlertCircle, ArrowLeft,
-  Library, Copy, RefreshCw, KeyRound,
+  Library, Copy, RefreshCw, KeyRound, Volume2, VolumeX,
+  Calendar, Send, X, Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -119,6 +120,14 @@ export default function AiCreatePage() {
   // Options
   const [skipImage, setSkipImage] = useState(false);
   const [skipVideo, setSkipVideo] = useState(false);
+  const [sound, setSound] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+
+  // Schedule modal
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("12:00");
+  const [scheduling, setScheduling] = useState(false);
 
   // Pipeline state
   const [running, setRunning] = useState(false);
@@ -177,6 +186,11 @@ export default function AiCreatePage() {
     if (errMsg) setStepError((prev) => ({ ...prev, [id]: errMsg }));
   }
 
+  const aspectRatioForFormat: "9:16" | "16:9" | "1:1" =
+    format === "reel" || format === "short" || format === "story" ? "9:16"
+    : format === "long_video" && platform === "youtube" ? "16:9"
+    : "1:1";
+
   function resetPipeline() {
     setRunning(false);
     setStepStatus({ script: "pending", image: "pending", video: "pending" });
@@ -186,6 +200,58 @@ export default function AiCreatePage() {
     setSceneImages([null, null, null]);
     setCurrentScene(0);
     setFinalResult(null);
+    setShowScheduleModal(false);
+  }
+
+  async function publishNow() {
+    if (!finalResult || !activeWorkspaceId) return;
+    if (!selectedAccountId) { toast.error("Selecciona una cuenta de destino"); return; }
+    setScheduling(true);
+    try {
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
+        body: JSON.stringify({
+          socialAccountId: selectedAccountId,
+          generatedPostId: finalResult.postId,
+          scheduledAt: new Date().toISOString(),
+          publishMode: "auto",
+        }),
+      });
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? "Error"); }
+      toast.success("Publicación enviada para publicar ahora");
+      setShowScheduleModal(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al publicar");
+    } finally {
+      setScheduling(false);
+    }
+  }
+
+  async function schedulePost() {
+    if (!finalResult || !activeWorkspaceId || !scheduleDate) return;
+    if (!selectedAccountId) { toast.error("Selecciona una cuenta de destino"); return; }
+    setScheduling(true);
+    try {
+      const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`).toISOString();
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
+        body: JSON.stringify({
+          socialAccountId: selectedAccountId,
+          generatedPostId: finalResult.postId,
+          scheduledAt,
+          publishMode: "auto",
+        }),
+      });
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? "Error"); }
+      toast.success("Publicación programada");
+      setShowScheduleModal(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al programar");
+    } finally {
+      setScheduling(false);
+    }
   }
 
   async function handleGenerate(e: React.FormEvent) {
@@ -247,11 +313,12 @@ export default function AiCreatePage() {
               method: "POST",
               headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
               body: JSON.stringify({
-                format: isVideo ? "image" : format,
+                format: "image",
                 platform,
                 promptText: prompts[i],
                 tone,
                 language,
+                aspectRatio: aspectRatioForFormat,
               }),
             });
 
@@ -311,9 +378,10 @@ export default function AiCreatePage() {
             promptText: script.videoPrompt,
             tone,
             language,
-            // Send all generated images as the visual story
             referenceImageUrls: generatedUrls.length > 0 ? generatedUrls : undefined,
             referenceImageUrl: generatedUrls[0] ?? undefined,
+            aspectRatio: aspectRatioForFormat,
+            sound,
             postId: script.postId,
           }),
         });
@@ -409,8 +477,12 @@ export default function AiCreatePage() {
             </div>
             {filteredAccounts.length > 0 && (
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Cuenta de destino (opcional)</label>
-                <select className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Cuenta de destino</label>
+                <select
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
                   <option value="">Sin asignar</option>
                   {filteredAccounts.map((a) => (
                     <option key={a.id} value={a.id}>{a.account_name}</option>
@@ -534,6 +606,13 @@ export default function AiCreatePage() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={skipVideo} onChange={(e) => setSkipVideo(e.target.checked)} className="rounded" />
                   <span className="text-sm text-muted-foreground">Omitir generación de video (solo guión + imagen)</span>
+                </label>
+              )}
+              {isVideo && !skipVideo && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} className="rounded" />
+                  {sound ? <Volume2 className="w-3.5 h-3.5 text-indigo-600" /> : <VolumeX className="w-3.5 h-3.5 text-muted-foreground" />}
+                  <span className="text-sm text-muted-foreground">Generar audio/voz con el video <span className="text-xs text-amber-600">(+créditos)</span></span>
                 </label>
               )}
             </div>
@@ -729,15 +808,94 @@ export default function AiCreatePage() {
 
               {/* Actions */}
               <div className="flex gap-2 pt-2">
-                <Link href={`/calendar?postId=${finalResult.postId}`}
-                  className="flex-1 text-center bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
-                  Programar publicación
-                </Link>
+                <button type="button" onClick={() => setShowScheduleModal(true)}
+                  className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
+                  <Calendar className="w-4 h-4" /> Programar / Publicar
+                </button>
                 <button type="button" onClick={resetPipeline}
                   className="px-4 py-2.5 border rounded-xl text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2">
                   <RefreshCw className="w-4 h-4" /> Crear otro
                 </button>
               </div>
+
+              {/* Schedule modal */}
+              {showScheduleModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-lg">Publicar contenido</h3>
+                      <button onClick={() => setShowScheduleModal(false)} className="text-muted-foreground hover:text-foreground">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Account selector */}
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Cuenta de destino *</label>
+                      <select
+                        value={selectedAccountId}
+                        onChange={(e) => setSelectedAccountId(e.target.value)}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="">Selecciona una cuenta...</option>
+                        {accounts.filter((a) => a.is_active).map((a) => (
+                          <option key={a.id} value={a.id}>{a.platform} — {a.account_name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Publish now */}
+                    <button
+                      type="button"
+                      onClick={publishNow}
+                      disabled={scheduling || !selectedAccountId}
+                      className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                    >
+                      {scheduling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      Publicar ahora
+                    </button>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-xs text-muted-foreground">o programar para</span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+
+                    {/* Schedule date/time */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Fecha</label>
+                        <input
+                          type="date"
+                          value={scheduleDate}
+                          onChange={(e) => setScheduleDate(e.target.value)}
+                          min={new Date().toISOString().split("T")[0]}
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">Hora</label>
+                        <input
+                          type="time"
+                          value={scheduleTime}
+                          onChange={(e) => setScheduleTime(e.target.value)}
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={schedulePost}
+                      disabled={scheduling || !selectedAccountId || !scheduleDate}
+                      className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                    >
+                      {scheduling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+                      Programar publicación
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

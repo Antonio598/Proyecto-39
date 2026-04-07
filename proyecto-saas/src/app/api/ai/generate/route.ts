@@ -21,6 +21,8 @@ export async function POST(request: Request) {
       useEmojis = true,
       referenceImageUrl,
       referenceImageUrls,
+      aspectRatio,
+      sound,
       postId,
     } = body;
 
@@ -68,6 +70,8 @@ export async function POST(request: Request) {
       useEmojis,
       referenceImageUrl,
       referenceImageUrls,
+      aspectRatio,
+      sound,
       brandContext: brand?.ai_context ?? undefined,
       nanoBananaKey,
       klingKey,
