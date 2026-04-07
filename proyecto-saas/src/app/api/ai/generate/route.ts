@@ -20,6 +20,7 @@ export async function POST(request: Request) {
       useHashtags = true,
       useEmojis = true,
       referenceImageUrl,
+      referenceImageUrls,
       postId,
     } = body;
 
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
       useHashtags,
       useEmojis,
       referenceImageUrl,
+      referenceImageUrls,
       brandContext: brand?.ai_context ?? undefined,
       nanoBananaKey,
       klingKey,

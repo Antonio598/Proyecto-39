@@ -48,6 +48,7 @@ interface ScriptData {
   hashtags: string[];
   imagePrompt: string;
   videoPrompt: string;
+  scenePrompts: string[]; // 3 scene prompts for the visual story
 }
 
 interface FinalResult {
@@ -129,7 +130,8 @@ export default function AiCreatePage() {
 
   // Intermediate results (shown progressively)
   const [scriptData, setScriptData] = useState<ScriptData | null>(null);
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [sceneImages, setSceneImages] = useState<(string | null)[]>([null, null, null]); // 3 scene image URLs
+  const [currentScene, setCurrentScene] = useState<number>(0); // which scene is being generated
   const [finalResult, setFinalResult] = useState<FinalResult | null>(null);
 
   const isVideo = VIDEO_FORMATS.includes(format);
@@ -181,7 +183,8 @@ export default function AiCreatePage() {
     setStepError({});
     setStepElapsed({});
     setScriptData(null);
-    setGeneratedImageUrl(null);
+    setSceneImages([null, null, null]);
+    setCurrentScene(0);
     setFinalResult(null);
   }
 
@@ -223,51 +226,66 @@ export default function AiCreatePage() {
       toast.success("Guión generado ✓");
 
       // ═══════════════════════════════════════════════════════
-      // STEP 2 — Image generation (Nano Banana) or bank asset
+      // STEP 2 — Generate 3 scene images (Nano Banana) or bank asset
       // ═══════════════════════════════════════════════════════
-      let imageUrl: string | null = null;
+      const generatedUrls: string[] = [];
 
       if (isImage || isVideo) {
         if (selectedAsset) {
-          // Use existing bank photo
-          imageUrl = selectedAsset.public_url;
-          setGeneratedImageUrl(imageUrl);
+          // Use existing bank photo as all 3 scenes
+          generatedUrls.push(selectedAsset.public_url);
+          setSceneImages([selectedAsset.public_url, null, null]);
           setStep("image", "skipped");
         } else if (!skipImage) {
           setStep("image", "running");
+          const prompts = script.scenePrompts?.length === 3 ? script.scenePrompts : [script.imagePrompt, script.imagePrompt, script.imagePrompt];
+          let anyFailed = false;
 
-          const imgRes = await fetch("/api/ai/generate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
-            body: JSON.stringify({
-              format: isVideo ? "image" : format,
-              platform,
-              promptText: script.imagePrompt,
-              tone,
-              language,
-              // Do NOT pass postId for image — creates its own DB record to avoid conflict with video job
-            }),
-          });
+          for (let i = 0; i < prompts.length; i++) {
+            setCurrentScene(i + 1);
+            const imgRes = await fetch("/api/ai/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
+              body: JSON.stringify({
+                format: isVideo ? "image" : format,
+                platform,
+                promptText: prompts[i],
+                tone,
+                language,
+              }),
+            });
 
-          const imgJson = await imgRes.json();
+            const imgJson = await imgRes.json();
+            if (!imgRes.ok) {
+              anyFailed = true;
+              continue;
+            }
 
-          if (!imgRes.ok) {
-            setStep("image", "error", imgJson.error ?? "Error al generar imagen");
-          } else {
             const imgResult = await pollJobUntilDone(
               imgJson.data.jobId,
               activeWorkspaceId,
               600,
               (s) => setStepElapsed((p) => ({ ...p, image: s })),
             );
+
             if (imgResult?.mediaUrls?.[0]) {
-              imageUrl = imgResult.mediaUrls[0];
-              setGeneratedImageUrl(imageUrl);
-              setStep("image", "done");
-              toast.success("Imagen generada ✓");
+              generatedUrls.push(imgResult.mediaUrls[0]);
+              setSceneImages((prev) => {
+                const next = [...prev];
+                next[i] = imgResult.mediaUrls![0];
+                return next;
+              });
             } else {
-              setStep("image", "error", imgResult?.error ?? "Nano Banana: tiempo de espera agotado");
+              anyFailed = true;
             }
+          }
+
+          if (generatedUrls.length === 0) {
+            setStep("image", "error", "Nano Banana no pudo generar las imágenes. Revisa tu API key.");
+          } else {
+            setStep("image", "done");
+            toast.success(`${generatedUrls.length} imagen${generatedUrls.length > 1 ? "es" : ""} generada${generatedUrls.length > 1 ? "s" : ""} ✓`);
+            if (anyFailed) toast.warning("Algunas escenas no se generaron, se usarán las disponibles.");
           }
         } else {
           setStep("image", "skipped");
@@ -277,7 +295,7 @@ export default function AiCreatePage() {
       }
 
       // ═══════════════════════════════════════════════════════
-      // STEP 3 — Video generation (Kling)
+      // STEP 3 — Video generation (Kling) with all 3 images
       // ═══════════════════════════════════════════════════════
       let videoUrl: string | null = null;
 
@@ -293,7 +311,9 @@ export default function AiCreatePage() {
             promptText: script.videoPrompt,
             tone,
             language,
-            referenceImageUrl: imageUrl ?? undefined,
+            // Send all generated images as the visual story
+            referenceImageUrls: generatedUrls.length > 0 ? generatedUrls : undefined,
+            referenceImageUrl: generatedUrls[0] ?? undefined,
             postId: script.postId,
           }),
         });
@@ -314,7 +334,7 @@ export default function AiCreatePage() {
             setStep("video", "done");
             toast.success("Video generado ✓");
           } else {
-            setStep("video", "error", videoResult?.error ?? "Kling: tiempo de espera agotado");
+            setStep("video", "error", "Kling: tiempo de espera agotado. Revisa tu API key.");
           }
         }
       } else if (isVideo && skipVideo) {
@@ -330,7 +350,7 @@ export default function AiCreatePage() {
         postId: script.postId,
         caption: script.caption,
         hashtags: script.hashtags,
-        imageUrl: imageUrl ?? undefined,
+        imageUrl: generatedUrls[0] ?? undefined,
         videoUrl: videoUrl ?? undefined,
       });
 
@@ -590,9 +610,9 @@ export default function AiCreatePage() {
                     {status === "running" && (
                       <p className="text-xs text-muted-foreground mt-1 ml-12">
                         {step.id === "image"
-                          ? "La generación de imágenes puede tardar 2–5 minutos, por favor espera…"
+                          ? `Generando escena ${currentScene}/3 — puede tardar 2–5 min por imagen…`
                           : step.id === "video"
-                          ? "La generación de video puede tardar 5–15 minutos, por favor espera…"
+                          ? "Creando video con las 3 escenas — puede tardar 5–15 minutos…"
                           : "Procesando…"}
                       </p>
                     )}
@@ -612,12 +632,22 @@ export default function AiCreatePage() {
                         )}
                       </div>
                     )}
-                    {/* Show image preview when done */}
-                    {step.id === "image" && status === "done" && generatedImageUrl && (
-                      <div className="mt-2 ml-12">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={generatedImageUrl} alt="Imagen generada"
-                          className="rounded-lg max-h-40 object-contain border" />
+                    {/* Show 3 scene thumbnails when image step is done */}
+                    {step.id === "image" && (status === "done" || status === "running") && sceneImages.some(Boolean) && (
+                      <div className="mt-2 ml-12 flex gap-2">
+                        {sceneImages.map((url, idx) => (
+                          <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border bg-muted flex-shrink-0 flex items-center justify-center">
+                            {url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={url} alt={`Escena ${idx + 1}`} className="w-full h-full object-cover" />
+                            ) : status === "running" && currentScene === idx + 1 ? (
+                              <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{idx + 1}</span>
+                            )}
+                            <span className="absolute bottom-0.5 right-0.5 text-[9px] bg-black/50 text-white px-1 rounded">{idx + 1}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
                     {i < PIPELINE_STEPS.length - 1 && (

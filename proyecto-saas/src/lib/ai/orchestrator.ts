@@ -11,7 +11,8 @@ export interface AiGenerationRequest {
   useHashtags?: boolean;
   useEmojis?: boolean;
   aspectRatio?: "9:16" | "16:9" | "1:1";
-  referenceImageUrl?: string;
+  referenceImageUrl?: string;    // single image
+  referenceImageUrls?: string[]; // multiple images for story video
   brandContext?: string;
   nanoBananaKey?: string;
   klingKey?: string;
@@ -55,6 +56,7 @@ export async function startAiGeneration(
       aspectRatio,
       duration,
       referenceImageUrl: req.referenceImageUrl,
+      referenceImageUrls: req.referenceImageUrls,
     });
 
     return { provider: "kling", jobId: result.jobId, type: "video" };

@@ -71,6 +71,7 @@ export async function POST(request: Request) {
           platform,
           imagePrompt: script.imagePrompt,
           videoPrompt: script.videoPrompt,
+          scenePrompts: script.scenePrompts,
           tone,
           language,
         },
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
         hashtags: script.hashtags,
         imagePrompt: script.imagePrompt,
         videoPrompt: script.videoPrompt,
+        scenePrompts: script.scenePrompts,
       },
     });
   } catch (error) {
