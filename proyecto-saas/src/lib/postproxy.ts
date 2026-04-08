@@ -105,7 +105,18 @@ export async function publishPost(params: {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.message ?? `Postproxy publish error ${res.status}`);
+    console.error("[Postproxy API Error]", res.status, "Payload sent:", payload, "Response:", err);
+    
+    // Attempt to extract detailed error messages (often found under err.errors or err.message or err.error)
+    const errorMsg = err?.errors 
+      ? JSON.stringify(err.errors) 
+      : err?.error 
+        ? (typeof err.error === 'string' ? err.error : JSON.stringify(err.error))
+        : err?.message 
+          ? err.message 
+          : JSON.stringify(err);
+
+    throw new Error(`Postproxy publish error ${res.status}: ${errorMsg}`);
   }
 
   return res.json();
