@@ -75,7 +75,7 @@ export async function GET(request: Request) {
           throw new Error("Facebook requiere media o caption para publicar");
         }
 
-        const isVid = mediaUrl ? mediaUrl.match(/\.(mp4|mov|webm)$/i) !== null : false;
+        const isVid = mediaUrl ? /\.(mp4|mov|webm|m4v)(\?|$)/i.test(mediaUrl) : false;
 
         const r = await publishPost({
           body: caption ?? "",
