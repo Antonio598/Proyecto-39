@@ -3,9 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/utils/errors";
-import { InstagramPublisher } from "@/lib/social/meta/instagram";
-import { FacebookPublisher } from "@/lib/social/meta/facebook";
 import { YouTubePublisher } from "@/lib/social/youtube/upload";
+import { publishPost, type PostproxyPlatform } from "@/lib/postproxy";
 
 export async function POST(
   request: Request,
@@ -66,43 +65,30 @@ export async function POST(
 
       const mediaUrl = content?.media_urls?.[0] ?? null;
 
-      if (account.platform === "instagram") {
-        if (!mediaUrl) {
+      const isPostproxyPlatform = ["facebook", "instagram", "linkedin", "tiktok"].includes(account.platform);
+
+      if (isPostproxyPlatform) {
+        const profileId = account.metadata?.postproxy_profile_id;
+        if (!profileId) {
+          throw new Error(`La cuenta de ${account.platform} no está correctamente vinculada con PostProxy.`);
+        }
+        if (!mediaUrl && account.platform === "instagram") {
           throw new Error("Instagram requiere media (imagen o video) para publicar");
         }
-        const ig = new InstagramPublisher(account.access_token, account.platform_user_id);
-
-        if (content?.format === "reel") {
-          const r = await ig.publishReel(mediaUrl, caption ?? "");
-          platformPostId = r.id;
-        } else if (content?.format === "story") {
-          const isVideo = mediaUrl.match(/\.(mp4|mov|webm)$/i) !== null;
-          const r = await ig.publishStory(mediaUrl, isVideo);
-          platformPostId = r.id;
-        } else if (content?.format === "carousel" && content.media_urls?.length > 1) {
-          const r = await ig.publishCarousel(content.media_urls, caption ?? "");
-          platformPostId = r.id;
-        } else {
-          const r = await ig.publishImage(mediaUrl, caption ?? "");
-          platformPostId = r.id;
+        if (!mediaUrl && !caption && account.platform === "facebook") {
+          throw new Error("Facebook requiere media o caption para publicar");
         }
-      } else if (account.platform === "facebook") {
-        const fb = new FacebookPublisher(
-          account.access_token,
-          account.metadata?.page_id ?? account.platform_user_id
-        );
 
-        if (mediaUrl && mediaUrl.match(/\.(mp4|mov|webm)$/i)) {
-          const r = await fb.publishVideo(mediaUrl, content?.caption ?? "Video", caption ?? "");
-          platformPostId = r.id;
-        } else if (mediaUrl) {
-          const r = await fb.publishPhoto(mediaUrl, caption ?? "");
-          platformPostId = r.id;
-        } else {
-          if (!caption) throw new Error("Facebook requiere media o caption para publicar");
-          const r = await fb.publishText(caption);
-          platformPostId = r.id;
-        }
+        const isVid = mediaUrl ? mediaUrl.match(/\.(mp4|mov|webm)$/i) !== null : false;
+
+        const r = await publishPost({
+          body: caption ?? "",
+          profiles: [profileId],
+          imageUrls: mediaUrl && !isVid ? (content?.media_urls?.length ? content.media_urls : [mediaUrl]) : undefined,
+          videoUrl: mediaUrl && isVid ? mediaUrl : undefined,
+        });
+        
+        platformPostId = r?.id ?? r?.post_id ?? r?.data?.id ?? `postproxy-${Date.now()}`;
       } else if (account.platform === "youtube") {
         if (!mediaUrl) {
           throw new Error("YouTube requiere un video para publicar");

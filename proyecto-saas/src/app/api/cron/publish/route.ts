@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { InstagramPublisher } from "@/lib/social/meta/instagram";
-import { FacebookPublisher } from "@/lib/social/meta/facebook";
 import { YouTubePublisher } from "@/lib/social/youtube/upload";
+import { publishPost, type PostproxyPlatform } from "@/lib/postproxy";
 
 // Vercel Cron calls this every minute
 export async function GET(request: Request) {
@@ -62,41 +61,30 @@ export async function GET(request: Request) {
 
       const mediaUrl = content?.media_urls?.[0] ?? null;
 
-      if (account.platform === "instagram") {
-        const ig = new InstagramPublisher(account.access_token, account.platform_user_id);
+      const isPostproxyPlatform = ["facebook", "instagram", "linkedin", "tiktok"].includes(account.platform);
 
-        if (content?.format === "reel" && mediaUrl) {
-          const r = await ig.publishReel(mediaUrl, caption ?? "");
-          platformPostId = r.id;
-        } else if (content?.format === "story" && mediaUrl) {
-          const isVideo = mediaUrl.match(/\.(mp4|mov|webm)$/i) !== null;
-          const r = await ig.publishStory(mediaUrl, isVideo);
-          platformPostId = r.id;
-        } else if (content?.format === "carousel" && content.media_urls?.length > 1) {
-          const r = await ig.publishCarousel(content.media_urls, caption ?? "");
-          platformPostId = r.id;
-        } else if (mediaUrl) {
-          const r = await ig.publishImage(mediaUrl, caption ?? "");
-          platformPostId = r.id;
-        } else if (caption) {
-          // Text-only post if no media
-          throw new Error("Instagram requires media — no media_url found");
-        } else {
-          throw new Error("Instagram post requires media and/or caption");
+      if (isPostproxyPlatform) {
+        const profileId = account.metadata?.postproxy_profile_id;
+        if (!profileId) {
+          throw new Error(`La cuenta de ${account.platform} no está correctamente vinculada con PostProxy.`);
         }
-      } else if (account.platform === "facebook") {
-        const fb = new FacebookPublisher(account.access_token, account.metadata?.page_id ?? account.platform_user_id);
+        if (!mediaUrl && account.platform === "instagram") {
+          throw new Error("Instagram requiere media (imagen o video) para publicar");
+        }
+        if (!mediaUrl && !caption && account.platform === "facebook") {
+          throw new Error("Facebook requiere media o caption para publicar");
+        }
 
-        if (mediaUrl && mediaUrl.match(/\.(mp4|mov|webm)$/i)) {
-          const r = await fb.publishVideo(mediaUrl, content?.caption ?? "Video", caption ?? "");
-          platformPostId = r.id;
-        } else if (mediaUrl) {
-          const r = await fb.publishPhoto(mediaUrl, caption ?? "");
-          platformPostId = r.id;
-        } else {
-          const r = await fb.publishText(caption ?? "");
-          platformPostId = r.id;
-        }
+        const isVid = mediaUrl ? mediaUrl.match(/\.(mp4|mov|webm)$/i) !== null : false;
+
+        const r = await publishPost({
+          body: caption ?? "",
+          profiles: [profileId],
+          imageUrls: mediaUrl && !isVid ? (content?.media_urls?.length ? content.media_urls : [mediaUrl]) : undefined,
+          videoUrl: mediaUrl && isVid ? mediaUrl : undefined,
+        });
+        
+        platformPostId = r?.id ?? r?.post_id ?? r?.data?.id ?? `postproxy-${Date.now()}`;
       } else if (account.platform === "youtube" && mediaUrl) {
         const yt = new YouTubePublisher(account.access_token);
         const r = await yt.uploadVideoByUrl(mediaUrl, {
