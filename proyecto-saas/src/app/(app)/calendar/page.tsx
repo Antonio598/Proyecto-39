@@ -437,10 +437,10 @@ export default function CalendarPage() {
             )}
 
             {/* Error message if failed */}
-            {selectedPost.status === "failed" && (selectedPost as any).error_message && (
+            {selectedPost.status === "failed" && selectedPost.error_message && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                 <p className="text-xs font-medium text-red-700 mb-1">Error anterior</p>
-                <p className="text-xs text-red-600">{(selectedPost as any).error_message}</p>
+                <p className="text-xs text-red-600">{selectedPost.error_message}</p>
               </div>
             )}
 
