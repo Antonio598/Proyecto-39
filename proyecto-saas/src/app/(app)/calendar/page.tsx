@@ -13,7 +13,7 @@ import {
 import { es } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Calendar, Plus, List, X, Clock, Send, Loader2,
-  Trash2, ExternalLink, CheckCircle,
+  Trash2, ExternalLink, CheckCircle, Sparkles, ImageIcon, Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { STATUS_COLORS, STATUS_LABELS, FORMAT_EMOJI } from "@/lib/utils/platform";
@@ -21,6 +21,15 @@ import { PlatformIcon } from "@/components/accounts/PlatformIcon";
 import { toast } from "sonner";
 import Link from "next/link";
 import type { ScheduledPost, SocialAccount } from "@/types/database";
+
+interface GeneratedPost {
+  id: string;
+  caption: string | null;
+  hashtags: string[];
+  media_urls: string[];
+  format: string;
+  created_at: string;
+}
 
 async function fetchPosts(workspaceId: string, from: string, to: string) {
   const params = new URLSearchParams({ from, to });
@@ -87,6 +96,7 @@ export default function CalendarPage() {
   const [scheduleTime, setScheduleTime] = useState("12:00");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [publishMode, setPublishMode] = useState<"auto" | "approval">("auto");
+  const [selectedGeneratedPostId, setSelectedGeneratedPostId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const monthStart = startOfMonth(currentDate);
@@ -116,6 +126,17 @@ export default function CalendarPage() {
       return (await res.json()).data ?? [];
     },
     enabled: !!activeWorkspaceId,
+  });
+
+  // Fetch AI-generated posts for the content picker (only when modal is open)
+  const { data: generatedPosts = [], isLoading: loadingGenerated } = useQuery<GeneratedPost[]>({
+    queryKey: ["generated-posts", activeWorkspaceId],
+    queryFn: async () => {
+      const res = await fetch("/api/generated-posts", { headers: { "x-workspace-id": activeWorkspaceId! } });
+      return (await res.json()).data ?? [];
+    },
+    enabled: !!activeWorkspaceId && !!selectedDay,
+    staleTime: 60_000,
   });
 
   const rescheduleMutation = useMutation({
@@ -159,6 +180,7 @@ export default function CalendarPage() {
     setScheduleTime("12:00");
     setSelectedAccountId("");
     setPublishMode("auto");
+    setSelectedGeneratedPostId(null);
   }
 
   // Publish a post immediately via direct publish endpoint
@@ -219,11 +241,12 @@ export default function CalendarPage() {
           socialAccountId: selectedAccountId,
           scheduledAt: scheduledAt.toISOString(),
           publishMode,
+          generatedPostId: selectedGeneratedPostId ?? undefined,
         }),
       });
       if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? "Error"); }
       queryClient.invalidateQueries({ queryKey: ["posts", activeWorkspaceId] });
-      toast.success("Publicación programada");
+      toast.success(selectedGeneratedPostId ? "✅ Publicación programada con contenido" : "Publicación programada");
       setSelectedDay(null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al programar");
@@ -516,7 +539,8 @@ export default function CalendarPage() {
       {/* ── Add-post Modal ────────────────────────────────────── */}
       {selectedDay && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold">Programar publicación</h3>
@@ -529,6 +553,7 @@ export default function CalendarPage() {
               </button>
             </div>
 
+            {/* Account */}
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">Cuenta *</label>
               <select
@@ -543,6 +568,7 @@ export default function CalendarPage() {
               </select>
             </div>
 
+            {/* Time */}
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">Hora</label>
               <input
@@ -553,6 +579,105 @@ export default function CalendarPage() {
               />
             </div>
 
+            {/* Content picker */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                  Contenido generado con IA
+                </label>
+                {selectedGeneratedPostId && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGeneratedPostId(null)}
+                    className="text-xs text-red-500 hover:text-red-700"
+                  >
+                    Quitar selección
+                  </button>
+                )}
+              </div>
+
+              {loadingGenerated ? (
+                <div className="flex items-center justify-center py-6 text-muted-foreground text-xs gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Cargando contenido...
+                </div>
+              ) : generatedPosts.length === 0 ? (
+                <div className="border border-dashed rounded-xl p-4 text-center">
+                  <Sparkles className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground mb-2">No tienes contenido generado con IA aún</p>
+                  <Link
+                    href="/create/ai"
+                    className="text-xs text-indigo-600 hover:underline font-medium"
+                    onClick={() => setSelectedDay(null)}
+                  >
+                    → Crear contenido con IA
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 max-h-52 overflow-y-auto pr-1">
+                  {generatedPosts.map((gp) => {
+                    const mediaUrl = gp.media_urls[0];
+                    const isVid = /\.(mp4|mov|webm)(\?|$)/i.test(mediaUrl ?? "");
+                    const isSelected = selectedGeneratedPostId === gp.id;
+                    return (
+                      <button
+                        key={gp.id}
+                        type="button"
+                        onClick={() => setSelectedGeneratedPostId(isSelected ? null : gp.id)}
+                        className={cn(
+                          "relative rounded-xl overflow-hidden border-2 transition-all aspect-square bg-muted group",
+                          isSelected
+                            ? "border-indigo-500 ring-2 ring-indigo-300 shadow-md"
+                            : "border-transparent hover:border-indigo-300"
+                        )}
+                      >
+                        {mediaUrl ? (
+                          isVid ? (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                              <Video className="w-6 h-6 text-white/60" />
+                            </div>
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
+                          )
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ImageIcon className="w-6 h-6 text-muted-foreground/40" />
+                          </div>
+                        )}
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-indigo-600/20 flex items-center justify-center">
+                            <CheckCircle className="w-6 h-6 text-indigo-600 drop-shadow" />
+                          </div>
+                        )}
+                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <p className="text-white text-[9px] leading-tight line-clamp-2">
+                            {gp.caption?.slice(0, 40) ?? gp.format}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Selected preview */}
+              {selectedGeneratedPostId && (() => {
+                const gp = generatedPosts.find((p) => p.id === selectedGeneratedPostId);
+                if (!gp) return null;
+                return (
+                  <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-start gap-3">
+                    <Sparkles className="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-indigo-700 mb-0.5">Contenido seleccionado</p>
+                      <p className="text-xs text-gray-600 line-clamp-2">{gp.caption ?? "Sin caption"}</p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Publish mode */}
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">Modo de publicación</label>
               <div className="grid grid-cols-2 gap-2">
@@ -575,6 +700,7 @@ export default function CalendarPage() {
               </div>
             </div>
 
+            {/* Actions */}
             <div className="pt-1 space-y-2">
               <button
                 type="button"
@@ -583,12 +709,13 @@ export default function CalendarPage() {
                 className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
-                Programar
+                {selectedGeneratedPostId ? "Programar con contenido" : "Programar sin contenido"}
               </button>
-              <p className="text-xs text-center text-muted-foreground">
-                Para asignar contenido IA ve a{" "}
-                <Link href="/create/ai" className="text-indigo-600 hover:underline">Crear con IA</Link>
-              </p>
+              {!selectedGeneratedPostId && (
+                <p className="text-xs text-center text-amber-600">
+                  ⚠️ Sin contenido, Instagram y YouTube necesitarán media para publicar.
+                </p>
+              )}
             </div>
           </div>
         </div>
