@@ -161,23 +161,21 @@ export default function CalendarPage() {
     setPublishMode("auto");
   }
 
-  // Publish a post immediately (set scheduled_at to 1 min ago + status approved)
+  // Publish a post immediately via direct publish endpoint
   async function publishPostNow(post: ScheduledPost) {
     if (!activeWorkspaceId) return;
     setPublishingIds((prev) => new Set(prev).add(post.id));
     try {
-      const publishAt = new Date(Date.now() - 60 * 1000).toISOString();
-      const res = await fetch(`/api/posts/${post.id}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/posts/${post.id}/publish`, {
+        method: "POST",
         headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
-        body: JSON.stringify({ scheduledAt: publishAt, status: "approved" }),
       });
+      const j = await res.json();
       if (!res.ok) {
-        const j = await res.json();
         throw new Error(j.error ?? "Error al publicar");
       }
       queryClient.invalidateQueries({ queryKey: ["posts", activeWorkspaceId] });
-      toast.success("✅ Enviado al cron — publicado en menos de 1 minuto");
+      toast.success("✅ Publicado correctamente");
       setSelectedPost(null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al publicar");

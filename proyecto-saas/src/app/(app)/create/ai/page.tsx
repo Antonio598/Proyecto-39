@@ -208,20 +208,28 @@ export default function AiCreatePage() {
     if (!selectedAccountId) { toast.error("Selecciona una cuenta de destino"); return; }
     setScheduling(true);
     try {
-      // Schedule 1 minute in the past so the cron picks it up on the next run
-      const publishAt = new Date(Date.now() - 60 * 1000).toISOString();
-      const res = await fetch("/api/posts", {
+      // First create the scheduled_post record
+      const createRes = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
         body: JSON.stringify({
           socialAccountId: selectedAccountId,
           generatedPostId: finalResult.postId,
-          scheduledAt: publishAt,
+          scheduledAt: new Date().toISOString(),
           publishMode: "auto",
         }),
       });
-      if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? "Error"); }
-      toast.success("Publicación enviada para publicar ahora");
+      if (!createRes.ok) { const j = await createRes.json(); throw new Error(j.error ?? "Error al crear el post"); }
+      const { data: createdPost } = await createRes.json();
+
+      // Then immediately publish it directly (no cron dependency)
+      const publishRes = await fetch(`/api/posts/${createdPost.id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
+      });
+      if (!publishRes.ok) { const j = await publishRes.json(); throw new Error(j.error ?? "Error al publicar"); }
+
+      toast.success("✅ Publicado correctamente");
       setShowScheduleModal(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al publicar");

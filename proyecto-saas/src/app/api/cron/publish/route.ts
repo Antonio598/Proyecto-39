@@ -35,8 +35,13 @@ export async function GET(request: Request) {
 
   for (const post of posts ?? []) {
     const account = post.social_account;
-    const content = post.generated_post;
-    if (!account || !content) continue;
+    const content = post.generated_post; // may be null for posts without AI content
+
+    // Skip posts with no social account (data integrity issue)
+    if (!account) {
+      console.warn(`[Cron Publish] Post ${post.id} skipped: no social account linked`);
+      continue;
+    }
 
     // Mark as publishing
     await supabase
@@ -46,49 +51,58 @@ export async function GET(request: Request) {
 
     try {
       let platformPostId: string | null = null;
-      const caption = [
-        content.caption ?? "",
-        content.hashtags?.join(" ") ?? "",
-      ].filter(Boolean).join("\n\n");
 
-      const mediaUrl = content.media_urls?.[0] ?? null;
+      // Build caption — only non-empty strings, avoid sending "" to platform APIs
+      const rawCaption = [
+        content?.caption ?? "",
+        content?.hashtags?.join(" ") ?? "",
+      ].filter(Boolean).join("\n\n");
+      // Use undefined (not "") when there is no caption so APIs don't reject
+      const caption = rawCaption.trim() || undefined;
+
+      const mediaUrl = content?.media_urls?.[0] ?? null;
 
       if (account.platform === "instagram") {
         const ig = new InstagramPublisher(account.access_token, account.platform_user_id);
 
-        if (content.format === "reel" && mediaUrl) {
-          const r = await ig.publishReel(mediaUrl, caption);
+        if (content?.format === "reel" && mediaUrl) {
+          const r = await ig.publishReel(mediaUrl, caption ?? "");
           platformPostId = r.id;
-        } else if (content.format === "story" && mediaUrl) {
+        } else if (content?.format === "story" && mediaUrl) {
           const isVideo = mediaUrl.match(/\.(mp4|mov|webm)$/i) !== null;
           const r = await ig.publishStory(mediaUrl, isVideo);
           platformPostId = r.id;
-        } else if (content.format === "carousel" && content.media_urls?.length > 1) {
-          const r = await ig.publishCarousel(content.media_urls, caption);
+        } else if (content?.format === "carousel" && content.media_urls?.length > 1) {
+          const r = await ig.publishCarousel(content.media_urls, caption ?? "");
           platformPostId = r.id;
         } else if (mediaUrl) {
-          const r = await ig.publishImage(mediaUrl, caption);
+          const r = await ig.publishImage(mediaUrl, caption ?? "");
           platformPostId = r.id;
+        } else if (caption) {
+          // Text-only post if no media
+          throw new Error("Instagram requires media — no media_url found");
+        } else {
+          throw new Error("Instagram post requires media and/or caption");
         }
       } else if (account.platform === "facebook") {
         const fb = new FacebookPublisher(account.access_token, account.metadata?.page_id ?? account.platform_user_id);
 
         if (mediaUrl && mediaUrl.match(/\.(mp4|mov|webm)$/i)) {
-          const r = await fb.publishVideo(mediaUrl, content.caption ?? "Video", caption);
+          const r = await fb.publishVideo(mediaUrl, content?.caption ?? "Video", caption ?? "");
           platformPostId = r.id;
         } else if (mediaUrl) {
-          const r = await fb.publishPhoto(mediaUrl, caption);
+          const r = await fb.publishPhoto(mediaUrl, caption ?? "");
           platformPostId = r.id;
         } else {
-          const r = await fb.publishText(caption);
+          const r = await fb.publishText(caption ?? "");
           platformPostId = r.id;
         }
       } else if (account.platform === "youtube" && mediaUrl) {
         const yt = new YouTubePublisher(account.access_token);
         const r = await yt.uploadVideoByUrl(mediaUrl, {
-          title: content.caption?.split("\n")[0]?.slice(0, 100) ?? "Video",
-          description: caption,
-          tags: content.hashtags?.map((h: string) => h.replace("#", "")) ?? [],
+          title: content?.caption?.split("\n")[0]?.slice(0, 100) ?? "Video",
+          description: caption ?? "",
+          tags: content?.hashtags?.map((h: string) => h.replace("#", "")) ?? [],
           privacyStatus: "public",
         });
         platformPostId = r.id;
