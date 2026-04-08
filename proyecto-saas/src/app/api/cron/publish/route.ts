@@ -77,11 +77,16 @@ export async function GET(request: Request) {
 
         const isVid = mediaUrl ? /\.(mp4|mov|webm|m4v)(\?|$)/i.test(mediaUrl) : false;
 
+        let mediaType: "REELS" | "STORY" | "FEED" = "FEED";
+        if (content?.format === "reel") mediaType = "REELS";
+        else if (content?.format === "story") mediaType = "STORY";
+
         const r = await publishPost({
           body: caption ?? "",
           profiles: [profileId],
           imageUrls: mediaUrl && !isVid ? (content?.media_urls?.length ? content.media_urls : [mediaUrl]) : undefined,
           videoUrl: mediaUrl && isVid ? mediaUrl : undefined,
+          mediaType,
         });
         
         platformPostId = r?.id ?? r?.post_id ?? r?.data?.id ?? `postproxy-${Date.now()}`;

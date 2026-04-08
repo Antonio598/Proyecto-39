@@ -1,0 +1,33 @@
+﻿{
+    "id":  "dc9a4313-3ed6-47d4-a39c-d3df57f975b5",
+    "format":  "reel",
+    "caption":  "¿Tu aire acondicionado no enfría como antes? 🥵🔧 ¡No te preocupes! Aquí te mostramos cómo reparar tu clima en 3 simples pasos. 🛠️✨ Recuerda, un aire bien mantenido no solo enfría mejor, ¡también ahorra energía! 🌍💡 #ReparaciónClima #AireAcondicionado #ConsejosÚtiles #HogarFeliz #DIY",
+    "hashtags":  [
+                     "reparar",
+                     "aire",
+                     "acondicionado",
+                     "mantenimiento",
+                     "consejos",
+                     "hogar",
+                     "ahorro",
+                     "energía",
+                     "diy",
+                     "técnicas"
+                 ],
+    "ai_job_id":  "n71e0fa1d056cde4a9f94227ed91b9a2de0klingo3",
+    "asset_ids":  [
+
+                  ],
+    "created_at":  "2026-04-07T07:01:59.352264+00:00",
+    "created_by":  "5cf83637-7ab6-4b66-af8f-58cfe2d1eb0f",
+    "media_urls":  [
+                       "https://tempfile.aiquickdraw.com/v/762de2ac4f008f45b32a8a50e8466ecf_1775545580.mp4"
+                   ],
+    "ai_provider":  "kling",
+    "ai_prompt_id":  null,
+    "workspace_id":  "9d839025-bbdb-4d23-a385-1557a8b8f53c",
+    "platform_data":  {
+                          "jobType":  "video",
+                          "referenceImageUrl":  "https://tempfile.aiquickdraw.com/images/1775545367162-tgh2ehj14bp.png"
+                      }
+}

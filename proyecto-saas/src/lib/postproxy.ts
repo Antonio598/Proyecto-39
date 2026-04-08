@@ -86,10 +86,14 @@ export async function publishPost(params: {
   profiles: string[];      // Postproxy profile IDs
   imageUrls?: string[];
   videoUrl?: string;
+  mediaType?: "REELS" | "STORY" | "FEED";
   scheduledAt?: string;    // ISO string
 }) {
   const payload: Record<string, unknown> = {
-    post: { body: params.body },
+    post: { 
+      body: params.body,
+      ...(params.mediaType && { media_type: params.mediaType })
+    },
     profiles: params.profiles,
   };
 
