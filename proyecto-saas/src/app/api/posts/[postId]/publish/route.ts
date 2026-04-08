@@ -88,8 +88,7 @@ export async function POST(
         const r = await publishPost({
           body: caption ?? "",
           profiles: [profileId],
-          imageUrls: mediaUrl && !isVid ? (content?.media_urls?.length ? content.media_urls : [mediaUrl]) : undefined,
-          videoUrl: mediaUrl && isVid ? mediaUrl : undefined,
+          mediaUrls: content?.media_urls?.length ? content.media_urls : (mediaUrl ? [mediaUrl] : undefined),
           mediaType,
         });
         

@@ -84,8 +84,7 @@ export async function createProfileGroup(name: string): Promise<{ id: string; na
 export async function publishPost(params: {
   body: string;
   profiles: string[];      // Postproxy profile IDs
-  imageUrls?: string[];
-  videoUrl?: string;
+  mediaUrls?: string[];
   mediaType?: "REELS" | "STORY" | "FEED";
   scheduledAt?: string;    // ISO string
 }) {
@@ -95,10 +94,12 @@ export async function publishPost(params: {
       ...(params.mediaType && { media_type: params.mediaType })
     },
     profiles: params.profiles,
+    media_urls: params.mediaUrls,
+    media: params.mediaUrls,
+    video_url: params.mediaUrls?.[0], // just in case
+    image_urls: params.mediaUrls, // just in case
   };
 
-  if (params.imageUrls?.length) payload.image_urls = params.imageUrls;
-  if (params.videoUrl) payload.video_url = params.videoUrl;
   if (params.scheduledAt) payload.scheduled_at = params.scheduledAt;
 
   const res = await fetch(`${POSTPROXY_API_URL}/api/posts`, {
