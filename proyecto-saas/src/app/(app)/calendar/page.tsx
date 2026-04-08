@@ -33,19 +33,39 @@ async function fetchPosts(workspaceId: string, from: string, to: string) {
 // Posts that can still be published
 const PUBLISHABLE_STATUSES = ["approved", "scheduled", "pending_approval", "failed"];
 
-function PostChip({ post, onClick }: { post: ScheduledPost; onClick: () => void }) {
+function PostChip({
+  post,
+  onClick,
+  onPublishNow,
+}: {
+  post: ScheduledPost;
+  onClick: () => void;
+  onPublishNow?: (post: ScheduledPost) => void;
+}) {
   const account = post.social_account;
   const content = post.generated_post;
+  const canPublish = PUBLISHABLE_STATUSES.includes(post.status);
   return (
-    <div
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className={cn(
-        "text-xs px-1.5 py-0.5 rounded cursor-pointer truncate flex items-center gap-1 hover:opacity-80 transition-opacity",
-        STATUS_COLORS[post.status]
+    <div className="group/chip relative">
+      <div
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        className={cn(
+          "text-xs px-1.5 py-0.5 rounded cursor-pointer truncate flex items-center gap-1 hover:opacity-80 transition-opacity pr-5",
+          STATUS_COLORS[post.status]
+        )}
+      >
+        {account && <PlatformIcon platform={account.platform} size="sm" className="w-3 h-3 flex-shrink-0" />}
+        <span className="truncate">{content?.caption?.slice(0, 30) ?? account?.account_name ?? "Post"}</span>
+      </div>
+      {canPublish && onPublishNow && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onPublishNow(post); }}
+          title="Publicar ahora"
+          className="absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/chip:opacity-100 transition-opacity bg-emerald-600 hover:bg-emerald-700 text-white rounded px-1 py-0.5 text-[9px] font-bold leading-none"
+        >
+          ⚡
+        </button>
       )}
-    >
-      {account && <PlatformIcon platform={account.platform} size="sm" className="w-3 h-3 flex-shrink-0" />}
-      <span className="truncate">{content?.caption?.slice(0, 30) ?? account?.account_name ?? "Post"}</span>
     </div>
   );
 }
@@ -59,7 +79,7 @@ export default function CalendarPage() {
 
   // Post detail modal
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
-  const [publishingNow, setPublishingNow] = useState(false);
+  const [publishingIds, setPublishingIds] = useState<Set<string>>(new Set());
   const [deletingPost, setDeletingPost] = useState(false);
 
   // Add-post modal state
@@ -144,7 +164,7 @@ export default function CalendarPage() {
   // Publish a post immediately (set scheduled_at to 1 min ago + status approved)
   async function publishPostNow(post: ScheduledPost) {
     if (!activeWorkspaceId) return;
-    setPublishingNow(true);
+    setPublishingIds((prev) => new Set(prev).add(post.id));
     try {
       const publishAt = new Date(Date.now() - 60 * 1000).toISOString();
       const res = await fetch(`/api/posts/${post.id}`, {
@@ -157,12 +177,12 @@ export default function CalendarPage() {
         throw new Error(j.error ?? "Error al publicar");
       }
       queryClient.invalidateQueries({ queryKey: ["posts", activeWorkspaceId] });
-      toast.success("✅ Publicación enviada al cron — estará publicada en menos de un minuto");
+      toast.success("✅ Enviado al cron — publicado en menos de 1 minuto");
       setSelectedPost(null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al publicar");
     } finally {
-      setPublishingNow(false);
+      setPublishingIds((prev) => { const next = new Set(prev); next.delete(post.id); return next; });
     }
   }
 
@@ -295,7 +315,12 @@ export default function CalendarPage() {
                     </div>
                     <div className="space-y-0.5">
                       {dayPosts.slice(0, 3).map((post) => (
-                        <PostChip key={post.id} post={post} onClick={() => setSelectedPost(post)} />
+                        <PostChip
+                          key={post.id}
+                          post={post}
+                          onClick={() => setSelectedPost(post)}
+                          onPublishNow={publishPostNow}
+                        />
                       ))}
                       {dayPosts.length > 3 && (
                         <div className="text-xs text-muted-foreground pl-1">+{dayPosts.length - 3} más</div>
@@ -347,10 +372,14 @@ export default function CalendarPage() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {canPublish && (
                       <button
-                        onClick={() => setSelectedPost(post)}
-                        className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                        onClick={() => publishPostNow(post)}
+                        disabled={publishingIds.has(post.id)}
+                        className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
                       >
-                        <Send className="w-3 h-3" />
+                        {publishingIds.has(post.id)
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <Send className="w-3 h-3" />
+                        }
                         Publicar ahora
                       </button>
                     )}
@@ -449,10 +478,10 @@ export default function CalendarPage() {
               {canPublishNow ? (
                 <button
                   onClick={() => publishPostNow(selectedPost)}
-                  disabled={publishingNow}
+                  disabled={publishingIds.has(selectedPost.id)}
                   className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                 >
-                  {publishingNow
+                  {publishingIds.has(selectedPost.id)
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : <Send className="w-4 h-4" />
                   }
