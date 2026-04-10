@@ -40,9 +40,19 @@ export async function POST(request: Request) {
       }
     }
 
-    const relevant = allProfiles.filter((p) =>
+    // Normalize platform names to lowercase before filtering
+    const normalizedProfiles = allProfiles.map((p) => ({
+      ...p,
+      platform: p.platform.toLowerCase(),
+    }));
+
+    console.log("[Sync] all platforms from Postproxy:", normalizedProfiles.map((p) => p.platform));
+
+    const relevant = normalizedProfiles.filter((p) =>
       POSTPROXY_PLATFORMS.includes(p.platform as SocialPlatform)
     );
+
+    console.log("[Sync] relevant profiles:", relevant.length, relevant.map((p) => `${p.platform}:${p.name}`));
 
     let saved = 0;
     for (const profile of relevant) {
@@ -69,7 +79,11 @@ export async function POST(request: Request) {
       else console.error("[Sync] upsert error", error.message);
     }
 
-    return NextResponse.json({ saved, total: relevant.length });
+    return NextResponse.json({
+      saved,
+      total: relevant.length,
+      allPlatforms: normalizedProfiles.map((p) => p.platform),
+    });
   } catch (error) {
     return handleApiError(error);
   }

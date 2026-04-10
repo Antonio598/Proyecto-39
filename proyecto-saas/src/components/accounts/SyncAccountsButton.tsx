@@ -17,7 +17,11 @@ export function SyncAccountsButton({ workspaceId }: { workspaceId: string }) {
     });
     const json = await res.json();
     if (res.ok) {
-      toast.success(`${json.saved} cuenta${json.saved !== 1 ? "s" : ""} sincronizada${json.saved !== 1 ? "s" : ""}`);
+      if (json.saved === 0) {
+        toast.warning(`Ninguna cuenta nueva. Plataformas encontradas: ${json.allPlatforms?.join(", ") || "ninguna"}`);
+      } else {
+        toast.success(`${json.saved} cuenta${json.saved !== 1 ? "s" : ""} sincronizada${json.saved !== 1 ? "s" : ""}`);
+      }
       router.refresh();
     } else {
       toast.error(json.error ?? "Error al sincronizar");
