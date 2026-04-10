@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireWorkspaceAccess } from "@/lib/auth/session";
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    await requireWorkspaceAccess(request);
     const key = process.env.POSTPROXY_API_KEY;
 
     // 1. Fetch all profile groups
