@@ -8,7 +8,7 @@ function headers() {
   };
 }
 
-export type PostproxyPlatform = "facebook" | "instagram" | "linkedin" | "tiktok";
+export type PostproxyPlatform = "facebook" | "instagram" | "linkedin" | "tiktok" | "youtube";
 
 /** Get the profile group ID — uses env var if set, otherwise first group */
 async function getProfileGroupId(): Promise<string> {

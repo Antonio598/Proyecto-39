@@ -6,7 +6,7 @@ import { getProfiles, type PostproxyProfile } from "@/lib/postproxy";
 import { handleApiError } from "@/lib/utils/errors";
 import type { SocialPlatform } from "@/types/database";
 
-const POSTPROXY_PLATFORMS: SocialPlatform[] = ["facebook", "instagram", "linkedin", "tiktok"];
+const POSTPROXY_PLATFORMS: SocialPlatform[] = ["facebook", "instagram", "linkedin", "tiktok", "youtube"];
 
 export async function POST(request: Request) {
   try {

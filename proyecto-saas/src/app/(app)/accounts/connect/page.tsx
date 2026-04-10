@@ -49,7 +49,7 @@ const PLATFORMS = [
     color: "border-red-200 hover:border-red-400 hover:bg-red-50",
     iconClass: "text-red-600",
     features: ["YouTube Shorts", "Videos largos", "Miniaturas automáticas"],
-    via: "google",
+    via: "postproxy",
   },
 ];
 

@@ -4,7 +4,7 @@ import { requireAuth } from "@/lib/auth/session";
 import { initializeConnection, type PostproxyPlatform } from "@/lib/postproxy";
 
 
-const SUPPORTED_PLATFORMS: PostproxyPlatform[] = ["facebook", "instagram", "linkedin", "tiktok"];
+const SUPPORTED_PLATFORMS: PostproxyPlatform[] = ["facebook", "instagram", "linkedin", "tiktok", "youtube"];
 
 export async function GET(request: Request) {
   try {
