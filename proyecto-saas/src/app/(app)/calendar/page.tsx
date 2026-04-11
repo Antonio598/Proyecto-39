@@ -95,6 +95,7 @@ export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [scheduleTime, setScheduleTime] = useState("12:00");
   const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [selectedFacebookPageId, setSelectedFacebookPageId] = useState("");
   const [publishMode, setPublishMode] = useState<"auto" | "approval">("auto");
   const [selectedGeneratedPostId, setSelectedGeneratedPostId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -179,9 +180,19 @@ export default function CalendarPage() {
     setSelectedDay(day);
     setScheduleTime("12:00");
     setSelectedAccountId("");
+    setSelectedFacebookPageId("");
     setPublishMode("auto");
     setSelectedGeneratedPostId(null);
   }
+
+  // Get Facebook pages for the selected account
+  const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
+  const facebookPages: { id: string; name: string }[] = (() => {
+    if (selectedAccount?.platform !== "facebook") return [];
+    const meta = selectedAccount.metadata as Record<string, unknown> | null;
+    const pages = meta?.facebook_pages;
+    return Array.isArray(pages) ? (pages as { id: string; name: string }[]) : [];
+  })();
 
   // Publish a post immediately via direct publish endpoint
   async function publishPostNow(post: ScheduledPost) {
@@ -234,6 +245,7 @@ export default function CalendarPage() {
       const scheduledAt = new Date(selectedDay);
       scheduledAt.setHours(h, m, 0, 0);
 
+      const selectedPage = facebookPages.find((p) => p.id === selectedFacebookPageId);
       const res = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
@@ -242,6 +254,8 @@ export default function CalendarPage() {
           scheduledAt: scheduledAt.toISOString(),
           publishMode,
           generatedPostId: selectedGeneratedPostId ?? undefined,
+          facebookPageId: selectedPage?.id,
+          facebookPageName: selectedPage?.name,
         }),
       });
       if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? "Error"); }
@@ -558,7 +572,7 @@ export default function CalendarPage() {
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">Cuenta *</label>
               <select
                 value={selectedAccountId}
-                onChange={(e) => setSelectedAccountId(e.target.value)}
+                onChange={(e) => { setSelectedAccountId(e.target.value); setSelectedFacebookPageId(""); }}
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">Selecciona una cuenta...</option>
@@ -567,6 +581,25 @@ export default function CalendarPage() {
                 ))}
               </select>
             </div>
+
+            {/* Facebook page picker */}
+            {facebookPages.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Página de Facebook *
+                </label>
+                <select
+                  value={selectedFacebookPageId}
+                  onChange={(e) => setSelectedFacebookPageId(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecciona una página...</option>
+                  {facebookPages.map((page) => (
+                    <option key={page.id} value={page.id}>{page.name} ({page.id})</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Time */}
             <div>

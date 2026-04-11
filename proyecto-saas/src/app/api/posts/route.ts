@@ -45,11 +45,16 @@ export async function POST(request: Request) {
     const {
       socialAccountId, generatedPostId, scheduledAt,
       publishMode = "approval",
+      facebookPageId, facebookPageName,
     } = body;
 
     if (!socialAccountId || !scheduledAt) {
       return NextResponse.json({ error: "socialAccountId and scheduledAt required" }, { status: 400 });
     }
+
+    const platformData: Record<string, string> = {};
+    if (facebookPageId) platformData.facebook_page_id = facebookPageId;
+    if (facebookPageName) platformData.facebook_page_name = facebookPageName;
 
     const { data, error } = await supabase
       .from("scheduled_posts")
@@ -60,6 +65,7 @@ export async function POST(request: Request) {
         status: publishMode === "auto" ? "approved" : "pending_approval",
         publish_mode: publishMode,
         scheduled_at: scheduledAt,
+        platform_data: platformData,
       })
       .select("*, generated_post:generated_posts(*), social_account:social_accounts(*)")
       .single();

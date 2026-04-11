@@ -85,11 +85,13 @@ export async function POST(
         if (content?.format === "reel") mediaType = "REELS";
         else if (content?.format === "story") mediaType = "STORY";
 
+        const postPlatformData = post.platform_data as Record<string, string> | null;
         const r = await publishPost({
           body: caption ?? "",
           profiles: [profileId],
           mediaUrls: content?.media_urls?.length ? content.media_urls : (mediaUrl ? [mediaUrl] : undefined),
           mediaType,
+          pageId: postPlatformData?.facebook_page_id,
         });
         
         platformPostId = r?.id ?? r?.post_id ?? r?.data?.id ?? `postproxy-${Date.now()}`;

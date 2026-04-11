@@ -3,12 +3,24 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, Trash2, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Trash2, Loader2, RefreshCw, Plus, X } from "lucide-react";
 import { PlatformIcon } from "@/components/accounts/PlatformIcon";
 import { PLATFORM_LABELS } from "@/lib/utils/platform";
 import { toast } from "sonner";
 import Link from "next/link";
 import type { SocialAccount } from "@/types/database";
+
+interface FacebookPage {
+  id: string;
+  name: string;
+}
+
+function getFacebookPages(account: SocialAccount): FacebookPage[] {
+  const meta = account.metadata as Record<string, unknown> | null;
+  const pages = meta?.facebook_pages;
+  if (!Array.isArray(pages)) return [];
+  return pages as FacebookPage[];
+}
 
 export default function AccountSettingsPage() {
   const router = useRouter();
@@ -20,6 +32,12 @@ export default function AccountSettingsPage() {
   const [autoPublish, setAutoPublish] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Facebook pages state
+  const [pages, setPages] = useState<FacebookPage[]>([]);
+  const [newPageId, setNewPageId] = useState("");
+  const [newPageName, setNewPageName] = useState("");
+  const [savingPages, setSavingPages] = useState(false);
+
   useEffect(() => {
     const supabase = createClient();
     supabase
@@ -30,6 +48,7 @@ export default function AccountSettingsPage() {
       .then(({ data }) => {
         setAccount(data);
         setAutoPublish(data?.auto_publish ?? false);
+        if (data) setPages(getFacebookPages(data));
         setLoading(false);
       });
   }, [accountId]);
@@ -57,6 +76,43 @@ export default function AccountSettingsPage() {
     if (res.ok) toast.success("Guardado");
     else toast.error("Error al guardar");
     setSaving(false);
+  }
+
+  async function savePages(updatedPages: FacebookPage[]) {
+    setSavingPages(true);
+    const currentMeta = (account?.metadata as Record<string, unknown>) ?? {};
+    const res = await fetch(`/api/social-accounts/${accountId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        metadata: { ...currentMeta, facebook_pages: updatedPages },
+      }),
+    });
+    if (res.ok) {
+      const { data } = await res.json();
+      setAccount(data);
+      setPages(getFacebookPages(data));
+      toast.success("Páginas guardadas");
+    } else {
+      toast.error("Error al guardar páginas");
+    }
+    setSavingPages(false);
+  }
+
+  function addPage() {
+    const trimId = newPageId.trim();
+    const trimName = newPageName.trim();
+    if (!trimId || !trimName) { toast.error("Completa el ID y el nombre de la página"); return; }
+    if (pages.some((p) => p.id === trimId)) { toast.error("Esa página ya está agregada"); return; }
+    const updated = [...pages, { id: trimId, name: trimName }];
+    setNewPageId("");
+    setNewPageName("");
+    savePages(updated);
+  }
+
+  function removePage(pageId: string) {
+    const updated = pages.filter((p) => p.id !== pageId);
+    savePages(updated);
   }
 
   if (loading) return (
@@ -104,6 +160,70 @@ export default function AccountSettingsPage() {
           </p>
         )}
       </div>
+
+      {/* Facebook Pages */}
+      {account.platform === "facebook" && (
+        <div className="bg-white rounded-xl border p-6 space-y-4">
+          <div>
+            <h2 className="font-semibold">Páginas de Facebook</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Agrega las páginas a las que quieres publicar. El ID lo encuentras en la URL de tu página de Facebook.
+            </p>
+          </div>
+
+          {/* Existing pages */}
+          {pages.length > 0 && (
+            <div className="space-y-2">
+              {pages.map((page) => (
+                <div key={page.id} className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5">
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">{page.name}</p>
+                    <p className="text-xs text-blue-600 font-mono">ID: {page.id}</p>
+                  </div>
+                  <button
+                    onClick={() => removePage(page.id)}
+                    disabled={savingPages}
+                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                    title="Eliminar página"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add new page form */}
+          <div className="border border-dashed rounded-xl p-4 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">Agregar página</p>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Nombre de la página"
+                value={newPageName}
+                onChange={(e) => setNewPageName(e.target.value)}
+                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                placeholder="Page ID (ej. 61575740184936)"
+                value={newPageId}
+                onChange={(e) => setNewPageId(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addPage()}
+                className="border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={addPage}
+              disabled={savingPages || !newPageId.trim() || !newPageName.trim()}
+              className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {savingPages ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Agregar página
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Settings */}
       <div className="bg-white rounded-xl border p-6 space-y-4">

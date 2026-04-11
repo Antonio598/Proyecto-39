@@ -87,11 +87,13 @@ export async function publishPost(params: {
   mediaUrls?: string[];
   mediaType?: "REELS" | "STORY" | "FEED";
   scheduledAt?: string;    // ISO string
+  pageId?: string;         // Facebook Page ID (optional)
 }) {
   const payload: Record<string, unknown> = {
-    post: { 
+    post: {
       body: params.body,
-      ...(params.mediaType && { media_type: params.mediaType })
+      ...(params.mediaType && { media_type: params.mediaType }),
+      ...(params.pageId && { page_id: params.pageId }),
     },
     profiles: params.profiles,
     media_urls: params.mediaUrls,

@@ -132,6 +132,7 @@ export interface ScheduledPost {
   scheduled_at: string;
   published_at: string | null;
   platform_post_id: string | null;
+  platform_data: Json;
   rejection_reason: string | null;
   approved_by: string | null;
   approved_at: string | null;
