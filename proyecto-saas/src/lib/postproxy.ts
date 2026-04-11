@@ -93,13 +93,13 @@ export async function publishPost(params: {
     post: {
       body: params.body,
       ...(params.mediaType && { media_type: params.mediaType }),
-      ...(params.pageId && { page_id: params.pageId }),
     },
     profiles: params.profiles,
     media_urls: params.mediaUrls,
     media: params.mediaUrls,
     video_url: params.mediaUrls?.[0], // just in case
     image_urls: params.mediaUrls, // just in case
+    ...(params.pageId && { page_id: params.pageId }),
   };
 
   if (params.scheduledAt) payload.scheduled_at = params.scheduledAt;
