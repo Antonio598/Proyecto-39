@@ -97,6 +97,9 @@ export async function publishPost(params: {
   if (params.platform === "youtube") {
     platformsExtra.youtube = { privacy_status: "public" };
   }
+  if (params.platform === "tiktok") {
+    platformsExtra.tiktok = { privacy_status: "PUBLIC_TO_EVERYONE" };
+  }
 
   const payload: Record<string, unknown> = {
     post: {
