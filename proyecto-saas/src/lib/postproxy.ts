@@ -99,7 +99,9 @@ export async function publishPost(params: {
     media: params.mediaUrls,
     video_url: params.mediaUrls?.[0], // just in case
     image_urls: params.mediaUrls, // just in case
-    ...(params.pageId && { page_id: params.pageId }),
+    ...(params.pageId && {
+      platforms: { facebook: { page_id: params.pageId } },
+    }),
   };
 
   if (params.scheduledAt) payload.scheduled_at = params.scheduledAt;
