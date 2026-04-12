@@ -3,13 +3,23 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 // Debug endpoint: publishes a minimal test post to Facebook via Postproxy
 // GET /api/social-accounts/facebook-debug?workspaceId=xxx&pageId=yyy
+// GET /api/social-accounts/facebook-debug?checkId=postproxy_post_id  (check status)
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const workspaceId = searchParams.get("workspaceId");
   const pageId = searchParams.get("pageId");
-
+  const checkId = searchParams.get("checkId");
   const key = process.env.POSTPROXY_API_KEY;
   if (!key) return NextResponse.json({ error: "No POSTPROXY_API_KEY" }, { status: 500 });
+
+  // If checkId provided, just fetch that post's status from Postproxy
+  if (checkId) {
+    const res = await fetch(`https://api.postproxy.dev/api/posts/${checkId}`, {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    const json = await res.json();
+    return NextResponse.json({ status: res.status, postproxyPost: json });
+  }
 
   // Get ALL Facebook social accounts (no workspace filter) to find the profile ID
   const admin = createAdminClient();
