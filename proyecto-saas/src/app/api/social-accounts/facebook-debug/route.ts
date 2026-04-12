@@ -11,12 +11,11 @@ export async function GET(request: Request) {
   const key = process.env.POSTPROXY_API_KEY;
   if (!key) return NextResponse.json({ error: "No POSTPROXY_API_KEY" }, { status: 500 });
 
-  // Get the Facebook social account for this workspace
+  // Get ALL Facebook social accounts (no workspace filter) to find the profile ID
   const admin = createAdminClient();
   const { data: accounts } = await admin
     .from("social_accounts")
     .select("*")
-    .eq("workspace_id", workspaceId ?? "")
     .eq("platform", "facebook");
 
   const account = accounts?.[0];
