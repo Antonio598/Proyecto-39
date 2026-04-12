@@ -21,6 +21,24 @@ export async function GET(request: Request) {
     return NextResponse.json({ status: res.status, postproxyPost: json });
   }
 
+  // If no pageId, return full profile details to discover available pages
+  if (!pageId) {
+    const admin = createAdminClient();
+    const { data: accounts } = await admin
+      .from("social_accounts")
+      .select("*")
+      .eq("platform", "facebook");
+    const account = accounts?.[0];
+    const profileId = (account?.metadata as Record<string, string> | null)?.postproxy_profile_id;
+    if (!profileId) return NextResponse.json({ error: "No Facebook profile found", accounts });
+
+    const res = await fetch(`https://api.postproxy.dev/api/profiles/${profileId}`, {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    const json = await res.json();
+    return NextResponse.json({ profileId, profileDetails: json });
+  }
+
   // Get ALL Facebook social accounts (no workspace filter) to find the profile ID
   const admin = createAdminClient();
   const { data: accounts } = await admin
