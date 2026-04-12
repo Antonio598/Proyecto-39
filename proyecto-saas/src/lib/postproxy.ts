@@ -91,8 +91,12 @@ export async function publishPost(params: {
   platform?: string;       // Platform name for platform-specific params
 }) {
   const platformsExtra: Record<string, unknown> = {};
-  if (params.pageId) {
-    platformsExtra.facebook = { page_id: params.pageId };
+  if (params.platform === "facebook") {
+    const fbFormat = params.mediaType === "STORY" ? "story" : "post";
+    platformsExtra.facebook = {
+      format: fbFormat,
+      ...(params.pageId && { page_id: params.pageId }),
+    };
   }
   if (params.platform === "youtube") {
     platformsExtra.youtube = { privacy_status: "public" };
@@ -138,5 +142,19 @@ export async function publishPost(params: {
     throw new Error(`Postproxy publish error ${res.status}: ${errorMsg}`);
   }
 
-  return res.json();
+  const result = await res.json();
+  console.log("[Postproxy] publish response:", JSON.stringify(result, null, 2));
+
+  // Check per-platform results — Postproxy returns overall "processed" even when
+  // individual platforms fail. Look for failure in any known response shape.
+  const platformResults = result?.platform_results ?? result?.platforms ?? result?.results ?? null;
+  if (platformResults && params.platform) {
+    const pr = platformResults[params.platform];
+    if (pr?.error || pr?.status === "failed" || pr?.status === "error") {
+      const errMsg = pr.error ?? pr.message ?? JSON.stringify(pr);
+      throw new Error(`${params.platform} publish error: ${errMsg}`);
+    }
+  }
+
+  return result;
 }
