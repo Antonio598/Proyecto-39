@@ -88,7 +88,16 @@ export async function publishPost(params: {
   mediaType?: "REELS" | "STORY" | "FEED";
   scheduledAt?: string;    // ISO string
   pageId?: string;         // Facebook Page ID (optional)
+  platform?: string;       // Platform name for platform-specific params
 }) {
+  const platformsExtra: Record<string, unknown> = {};
+  if (params.pageId) {
+    platformsExtra.facebook = { page_id: params.pageId };
+  }
+  if (params.platform === "youtube") {
+    platformsExtra.youtube = { privacy_status: "public" };
+  }
+
   const payload: Record<string, unknown> = {
     post: {
       body: params.body,
@@ -99,9 +108,7 @@ export async function publishPost(params: {
     media: params.mediaUrls,
     video_url: params.mediaUrls?.[0], // just in case
     image_urls: params.mediaUrls, // just in case
-    ...(params.pageId && {
-      platforms: { facebook: { page_id: params.pageId } },
-    }),
+    ...(Object.keys(platformsExtra).length > 0 && { platforms: platformsExtra }),
   };
 
   if (params.scheduledAt) payload.scheduled_at = params.scheduledAt;

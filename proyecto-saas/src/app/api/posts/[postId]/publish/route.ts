@@ -110,6 +110,7 @@ export async function POST(
           mediaUrls: content?.media_urls?.length ? content.media_urls : (mediaUrl ? [mediaUrl] : undefined),
           mediaType,
           pageId: facebookPageId,
+          platform: account.platform,
         });
         
         platformPostId = r?.id ?? r?.post_id ?? r?.data?.id ?? `postproxy-${Date.now()}`;
