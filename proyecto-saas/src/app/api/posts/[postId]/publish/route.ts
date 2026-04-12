@@ -3,8 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/utils/errors";
-import { YouTubePublisher } from "@/lib/social/youtube/upload";
-import { publishPost, type PostproxyPlatform } from "@/lib/postproxy";
+import { publishPost } from "@/lib/postproxy";
 
 export async function POST(
   request: Request,
@@ -65,7 +64,7 @@ export async function POST(
 
       const mediaUrl = content?.media_urls?.[0] ?? null;
 
-      const isPostproxyPlatform = ["facebook", "instagram", "linkedin", "tiktok"].includes(account.platform);
+      const isPostproxyPlatform = ["facebook", "instagram", "linkedin", "tiktok", "youtube"].includes(account.platform);
 
       if (isPostproxyPlatform) {
         const profileId = account.metadata?.postproxy_profile_id;
@@ -78,8 +77,6 @@ export async function POST(
         if (!mediaUrl && !caption && account.platform === "facebook") {
           throw new Error("Facebook requiere media o caption para publicar");
         }
-
-        const isVid = mediaUrl ? /\.(mp4|mov|webm|m4v)(\?|$)/i.test(mediaUrl) : false;
 
         let mediaType: "REELS" | "STORY" | "FEED" = "FEED";
         if (content?.format === "reel") mediaType = "REELS";
@@ -116,18 +113,6 @@ export async function POST(
         });
         
         platformPostId = r?.id ?? r?.post_id ?? r?.data?.id ?? `postproxy-${Date.now()}`;
-      } else if (account.platform === "youtube") {
-        if (!mediaUrl) {
-          throw new Error("YouTube requiere un video para publicar");
-        }
-        const yt = new YouTubePublisher(account.access_token);
-        const r = await yt.uploadVideoByUrl(mediaUrl, {
-          title: content?.caption?.split("\n")[0]?.slice(0, 100) ?? "Video",
-          description: caption ?? "",
-          tags: content?.hashtags?.map((h: string) => h.replace("#", "")) ?? [],
-          privacyStatus: "public",
-        });
-        platformPostId = r.id;
       } else {
         throw new Error(`Plataforma "${account.platform}" no soportada`);
       }
