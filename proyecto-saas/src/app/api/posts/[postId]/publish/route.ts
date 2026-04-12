@@ -85,13 +85,34 @@ export async function POST(
         if (content?.format === "reel") mediaType = "REELS";
         else if (content?.format === "story") mediaType = "STORY";
 
-        const postPlatformData = post.platform_data as Record<string, string> | null;
+        // Resolve Facebook page_id: from post's platform_data, or fall back to
+        // the first configured page in the account's metadata
+        let facebookPageId: string | undefined;
+        if (account.platform === "facebook") {
+          const postData = post.platform_data as Record<string, string> | null;
+          facebookPageId = postData?.facebook_page_id;
+
+          if (!facebookPageId) {
+            const accountMeta = account.metadata as Record<string, unknown> | null;
+            const pages = accountMeta?.facebook_pages;
+            if (Array.isArray(pages) && pages.length > 0) {
+              facebookPageId = (pages[0] as { id: string }).id;
+            }
+          }
+
+          if (!facebookPageId) {
+            throw new Error(
+              "Facebook requiere un Page ID. Ve a Cuentas → Configuración de la cuenta de Facebook y agrega tu Page ID."
+            );
+          }
+        }
+
         const r = await publishPost({
           body: caption ?? "",
           profiles: [profileId],
           mediaUrls: content?.media_urls?.length ? content.media_urls : (mediaUrl ? [mediaUrl] : undefined),
           mediaType,
-          pageId: postPlatformData?.facebook_page_id,
+          pageId: facebookPageId,
         });
         
         platformPostId = r?.id ?? r?.post_id ?? r?.data?.id ?? `postproxy-${Date.now()}`;
