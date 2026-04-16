@@ -6,7 +6,7 @@ import { KeyRound, Save, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle } from 
 import { toast } from "sonner";
 
 interface KeyField {
-  id: "openaiKey" | "nanoBananaKey" | "klingKey";
+  id: "openaiKey" | "nanoBananaKey" | "klingKey" | "elevenLabsKey";
   label: string;
   subtitle: string;
   placeholder: string;
@@ -55,6 +55,18 @@ const KEY_FIELDS: KeyField[] = [
     purpose: "Reels, Shorts, videos",
     required: false,
   },
+  {
+    id: "elevenLabsKey",
+    label: "ElevenLabs API Key",
+    subtitle: "Voz en off para videos",
+    placeholder: "sk_...",
+    description: "Genera una voz en off natural a partir del guión del video. Al activar la voz, Kling genera el video sin sonido y ElevenLabs agrega la narración.",
+    emoji: "🔊",
+    gradient: "from-violet-50 to-fuchsia-50",
+    borderColor: "border-violet-100",
+    purpose: "Voz en Reels y Shorts",
+    required: false,
+  },
 ];
 
 export default function IntegrationsPage() {
@@ -65,6 +77,7 @@ export default function IntegrationsPage() {
     openaiKey: "",
     nanoBananaKey: "",
     klingKey: "",
+    elevenLabsKey: "",
   });
   const [show, setShow] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
@@ -80,6 +93,7 @@ export default function IntegrationsPage() {
             openaiKey: !!json.keys.hasOpenaiKey,
             nanoBananaKey: !!json.keys.hasNanoBananaKey,
             klingKey: !!json.keys.hasKlingKey,
+            elevenLabsKey: !!json.keys.hasElevenLabsKey,
           });
         }
       })
@@ -123,7 +137,7 @@ export default function IntegrationsPage() {
         if (keys[id]) newSaved[id] = true;
       });
       setSaved(newSaved);
-      setKeys({ openaiKey: "", nanoBananaKey: "", klingKey: "" });
+      setKeys({ openaiKey: "", nanoBananaKey: "", klingKey: "", elevenLabsKey: "" });
     } else {
       toast.error("Error al guardar las API keys");
     }

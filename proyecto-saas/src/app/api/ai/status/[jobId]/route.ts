@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { pollJobStatus } from "@/lib/ai/orchestrator";
 import { handleApiError } from "@/lib/utils/errors";
+import { mergeAudioVideo } from "@/lib/ai/merge";
 
 export const maxDuration = 60;
 
@@ -67,9 +68,49 @@ export async function GET(
       if ("imageUrl" in jobStatus && jobStatus.imageUrl) {
         updates.media_urls = [jobStatus.imageUrl];
       }
+
+      // For video: if a voice-over was pre-generated, merge audio + video with FFmpeg
       if ("videoUrl" in jobStatus && jobStatus.videoUrl) {
-        updates.media_urls = [jobStatus.videoUrl];
+        const voiceUrl = post.platform_data?.voice_url as string | undefined;
+
+        if (voiceUrl) {
+          try {
+            // Download the stored MP3
+            const audioRes = await fetch(voiceUrl);
+            if (!audioRes.ok) throw new Error(`Failed to fetch voice audio: ${audioRes.status}`);
+            const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+
+            // FFmpeg merge
+            const mergedBuffer = await mergeAudioVideo({
+              videoUrl: jobStatus.videoUrl,
+              audioBuffer,
+            });
+
+            // Upload merged MP4 to Supabase Storage
+            const mergedPath = `${workspaceId}/videos/${post.id}-voiced.mp4`;
+            const { error: uploadError } = await admin.storage
+              .from("workspace-media")
+              .upload(mergedPath, mergedBuffer, { contentType: "video/mp4", upsert: true });
+
+            if (!uploadError) {
+              const { data: { publicUrl } } = admin.storage
+                .from("workspace-media")
+                .getPublicUrl(mergedPath);
+              updates.media_urls = [publicUrl];
+              jobStatus.videoUrl = publicUrl;
+            } else {
+              // Merge failed — fall back to raw Kling video
+              updates.media_urls = [jobStatus.videoUrl];
+            }
+          } catch {
+            // Merge failed — fall back to raw Kling video
+            updates.media_urls = [jobStatus.videoUrl];
+          }
+        } else {
+          updates.media_urls = [jobStatus.videoUrl];
+        }
       }
+
       if ("caption" in jobStatus && jobStatus.caption) {
         updates.caption = jobStatus.caption;
       }

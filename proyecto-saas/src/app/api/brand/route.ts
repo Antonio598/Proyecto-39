@@ -31,6 +31,7 @@ export async function GET(request: Request) {
         hasOpenaiKey: !!data?.openai_key,
         hasNanoBananaKey: !!data?.nano_banana_key,
         hasKlingKey: !!data?.kling_key,
+        hasElevenLabsKey: !!data?.elevenlabs_key,
       },
     });
   } catch (error) {
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
 
     const {
       primaryColor, secondaryColor, fontPrimary, toneOfVoice,
-      niche, guidelines, aiContext, nanoBananaKey, klingKey, openaiKey,
+      niche, guidelines, aiContext, nanoBananaKey, klingKey, openaiKey, elevenLabsKey,
     } = body;
 
     // Build update payload — only include key fields when the user actually typed something
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
     if (openaiKey?.trim()) upsertPayload.openai_key = openaiKey.trim();
     if (nanoBananaKey?.trim()) upsertPayload.nano_banana_key = nanoBananaKey.trim();
     if (klingKey?.trim()) upsertPayload.kling_key = klingKey.trim();
+    if (elevenLabsKey?.trim()) upsertPayload.elevenlabs_key = elevenLabsKey.trim();
 
     const { data, error } = await admin
       .from("brand_settings")

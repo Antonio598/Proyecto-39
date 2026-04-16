@@ -63,7 +63,7 @@ interface FinalResult {
 const PIPELINE_STEPS: PipelineStep[] = [
   { id: "script", label: "Guión y copy", sublabel: "GPT-4o mini", emoji: "🤖" },
   { id: "image", label: "Imagen", sublabel: "Nano Banana", emoji: "🍌" },
-  { id: "video", label: "Video", sublabel: "Kling AI", emoji: "🎬" },
+  { id: "video", label: "Video", sublabel: "Kling AI + ElevenLabs", emoji: "🎬" },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -622,7 +622,10 @@ export default function AiCreatePage() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} className="rounded" />
                   {sound ? <Volume2 className="w-3.5 h-3.5 text-indigo-600" /> : <VolumeX className="w-3.5 h-3.5 text-muted-foreground" />}
-                  <span className="text-sm text-muted-foreground">Generar audio/voz con el video <span className="text-xs text-amber-600">(+créditos)</span></span>
+                  <span className="text-sm text-muted-foreground">
+                    Agregar voz en off con ElevenLabs{" "}
+                    <span className="text-xs text-indigo-500">(requiere ElevenLabs API key)</span>
+                  </span>
                 </label>
               )}
             </div>
