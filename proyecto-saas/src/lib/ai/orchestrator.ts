@@ -50,7 +50,7 @@ export async function startAiGeneration(
 
     const kling = new KlingClient(req.klingKey);
     const aspectRatio = req.aspectRatio ?? getAspectRatioForFormat(req.format, req.platform);
-    const duration = req.format === "long_video" ? 10 : 5;
+    const duration = 10; // always use 10s (Kling max for std models)
 
     const result = await kling.generateVideo({
       prompt: req.promptText,

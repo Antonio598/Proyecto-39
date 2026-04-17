@@ -8,7 +8,7 @@ const BASE_URL = "https://kling3api.com";
 export interface KlingGenerateVideoRequest {
   prompt: string;
   negativePrompt?: string;
-  duration?: number;            // 3–15s, default 5
+  duration?: number;            // 5 or 10 (Kling supports 5 and 10 seconds)
   aspectRatio?: "9:16" | "16:9" | "1:1";
   referenceImageUrl?: string;   // single image → std-image-to-video
   referenceImageUrls?: string[]; // multiple images → o3-std-reference-to-video
@@ -47,9 +47,10 @@ export class KlingClient {
     let type: string;
     const body: Record<string, unknown> = {
       prompt: req.prompt,
-      duration: req.duration ?? 5,
+      duration: req.duration ?? 10,
       aspect_ratio: req.aspectRatio ?? "9:16",
       sound: req.sound ?? false,
+      watermark: false,
     };
 
     if (req.negativePrompt) body.negative_prompt = req.negativePrompt;
