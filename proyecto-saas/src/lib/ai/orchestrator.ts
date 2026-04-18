@@ -84,6 +84,38 @@ export async function startAiGeneration(
   return { provider: "nano_banana", jobId: `text_${Date.now()}`, type: "copy" };
 }
 
+export interface MultiClipJobRef {
+  provider: "kling";
+  primaryJobId: string;
+  jobs: { jobId: string; scene: number; imageUrl: string }[];
+  type: "video";
+}
+
+export async function startMultiClipGeneration(
+  req: AiGenerationRequest & { referenceImageUrls: string[] }
+): Promise<MultiClipJobRef> {
+  if (!req.klingKey) throw new Error("Kling API key required for multi-clip generation");
+
+  const kling = new KlingClient(req.klingKey);
+  const aspectRatio = req.aspectRatio ?? getAspectRatioForFormat(req.format, req.platform);
+
+  // Fire one Kling job per image in parallel — each clip = std-image-to-video
+  const jobs = await Promise.all(
+    req.referenceImageUrls.slice(0, 3).map(async (imageUrl, i) => {
+      const result = await kling.generateVideo({
+        prompt: req.promptText,
+        aspectRatio,
+        duration: 10,
+        sound: req.sound,
+        referenceImageUrl: imageUrl,
+      });
+      return { jobId: result.jobId, scene: i + 1, imageUrl };
+    })
+  );
+
+  return { provider: "kling", primaryJobId: jobs[0].jobId, jobs, type: "video" };
+}
+
 export async function pollJobStatus(
   ref: AiGenerationJobRef,
   nanoBananaKey?: string,

@@ -63,7 +63,7 @@ interface FinalResult {
 const PIPELINE_STEPS: PipelineStep[] = [
   { id: "script", label: "Guión y copy", sublabel: "GPT-4o mini", emoji: "🤖" },
   { id: "image", label: "Imagen", sublabel: "Nano Banana", emoji: "🍌" },
-  { id: "video", label: "Video", sublabel: "Kling AI + ElevenLabs", emoji: "🎬" },
+  { id: "video", label: "Video (~30s)", sublabel: "Kling AI × 3 clips + FFmpeg", emoji: "🎬" },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -705,7 +705,7 @@ export default function AiCreatePage() {
                         {step.id === "image"
                           ? `Generando escena ${currentScene}/3 — puede tardar 2–5 min por imagen…`
                           : step.id === "video"
-                          ? "Creando video con las 3 escenas — puede tardar 5–15 minutos…"
+                          ? "Generando 3 clips de 10s en paralelo y concatenando — puede tardar 5–15 min…"
                           : "Procesando…"}
                       </p>
                     )}
