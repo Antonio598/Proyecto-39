@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { YouTubePublisher } from "@/lib/social/youtube/upload";
-import { publishPost, type PostproxyPlatform } from "@/lib/postproxy";
+import { publishPost } from "@/lib/postproxy";
 
 // Vercel Cron calls this every minute
 export async function GET(request: Request) {
@@ -61,7 +60,7 @@ export async function GET(request: Request) {
 
       const mediaUrl = content?.media_urls?.[0] ?? null;
 
-      const isPostproxyPlatform = ["facebook", "instagram", "linkedin", "tiktok"].includes(account.platform);
+      const isPostproxyPlatform = ["facebook", "instagram", "linkedin", "tiktok", "youtube"].includes(account.platform);
 
       if (isPostproxyPlatform) {
         const profileId = account.metadata?.postproxy_profile_id;
@@ -78,26 +77,26 @@ export async function GET(request: Request) {
         const isVid = mediaUrl ? /\.(mp4|mov|webm|m4v)(\?|$)/i.test(mediaUrl) : false;
 
         let mediaType: "REELS" | "STORY" | "FEED" = "FEED";
-        if (content?.format === "reel") mediaType = "REELS";
+        if (content?.format === "reel" || (account.platform === "youtube" && isVid)) mediaType = "REELS";
         else if (content?.format === "story") mediaType = "STORY";
+
+        // Resolve Facebook page_id from post platform_data or account metadata
+        const facebookPageId =
+          post.platform_data?.facebook_page_id as string | undefined
+          ?? (account.platform === "facebook"
+            ? (account.metadata?.facebook_pages as Array<{ id: string }> | undefined)?.[0]?.id
+            : undefined);
 
         const r = await publishPost({
           body: caption ?? "",
           profiles: [profileId],
           mediaUrls: content?.media_urls?.length ? content.media_urls : (mediaUrl ? [mediaUrl] : undefined),
           mediaType,
+          platform: account.platform,
+          pageId: facebookPageId,
         });
-        
+
         platformPostId = r?.id ?? r?.post_id ?? r?.data?.id ?? `postproxy-${Date.now()}`;
-      } else if (account.platform === "youtube" && mediaUrl) {
-        const yt = new YouTubePublisher(account.access_token);
-        const r = await yt.uploadVideoByUrl(mediaUrl, {
-          title: content?.caption?.split("\n")[0]?.slice(0, 100) ?? "Video",
-          description: caption ?? "",
-          tags: content?.hashtags?.map((h: string) => h.replace("#", "")) ?? [],
-          privacyStatus: "public",
-        });
-        platformPostId = r.id;
       }
 
       // Mark as published
