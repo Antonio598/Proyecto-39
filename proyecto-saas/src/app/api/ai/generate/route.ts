@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
-import { startAiGeneration, startMultiClipGeneration } from "@/lib/ai/orchestrator";
+import { startAiGeneration } from "@/lib/ai/orchestrator";
 import { handleApiError, ApiError } from "@/lib/utils/errors";
 import { generateSpeech, captionToVoiceScript } from "@/lib/ai/elevenlabs";
 
@@ -98,61 +98,27 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── Multi-clip (3 images → 3 Kling jobs in parallel) or single-clip ────
-    const multiClipUrls = (referenceImageUrls as string[] | undefined)?.filter(Boolean) ?? [];
-    const useMultiClip = isVideo && multiClipUrls.length > 1;
-
-    let primaryJobId: string;
-    let aiProvider: string;
-    let jobType: string;
-    let multiClipJobs: { jobId: string; scene: number; imageUrl: string }[] | undefined;
-
-    if (useMultiClip) {
-      const multiRef = await startMultiClipGeneration({
-        format,
-        platform,
-        promptText,
-        tone,
-        language,
-        useHashtags,
-        useEmojis,
-        aspectRatio,
-        sound: useVoice ? false : sound,
-        brandContext: brand?.ai_context ?? undefined,
-        klingKey: klingKey!,
-        referenceImageUrls: multiClipUrls,
-      });
-      primaryJobId = multiRef.primaryJobId;
-      aiProvider = multiRef.provider;
-      jobType = multiRef.type;
-      multiClipJobs = multiRef.jobs;
-    } else {
-      const jobRef = await startAiGeneration({
-        format,
-        platform,
-        promptText,
-        tone,
-        language,
-        useHashtags,
-        useEmojis,
-        referenceImageUrl,
-        referenceImageUrls,
-        aspectRatio,
-        sound: useVoice ? false : sound,
-        brandContext: brand?.ai_context ?? undefined,
-        nanoBananaKey,
-        klingKey,
-      });
-      primaryJobId = jobRef.jobId;
-      aiProvider = jobRef.provider;
-      jobType = jobRef.type;
-    }
+    const jobRef = await startAiGeneration({
+      format,
+      platform,
+      promptText,
+      tone,
+      language,
+      useHashtags,
+      useEmojis,
+      referenceImageUrl,
+      referenceImageUrls,
+      aspectRatio,
+      sound: useVoice ? false : sound,
+      brandContext: brand?.ai_context ?? undefined,
+      nanoBananaKey,
+      klingKey,
+    });
 
     const platformData = {
-      referenceImageUrl: multiClipUrls[0] ?? referenceImageUrl,
-      jobType,
+      referenceImageUrl,
+      jobType: jobRef.type,
       ...(voiceUrl ? { voice_url: voiceUrl } : {}),
-      ...(multiClipJobs ? { multi_clip_jobs: multiClipJobs } : {}),
     };
 
     let finalPostId = postId;
@@ -160,7 +126,7 @@ export async function POST(request: Request) {
     if (postId) {
       await admin
         .from("generated_posts")
-        .update({ ai_job_id: primaryJobId, ai_provider: aiProvider, platform_data: platformData })
+        .update({ ai_job_id: jobRef.jobId, ai_provider: jobRef.provider, platform_data: platformData })
         .eq("id", postId);
     } else {
       const { data: newPost, error: insertError } = await admin
@@ -172,8 +138,8 @@ export async function POST(request: Request) {
           caption: null,
           hashtags: [],
           media_urls: [],
-          ai_job_id: primaryJobId,
-          ai_provider: aiProvider,
+          ai_job_id: jobRef.jobId,
+          ai_provider: jobRef.provider,
           platform_data: { platform, ...platformData },
         })
         .select()
@@ -186,9 +152,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       data: {
         postId: finalPostId,
-        jobId: primaryJobId,
-        provider: aiProvider,
-        type: jobType,
+        jobId: jobRef.jobId,
+        provider: jobRef.provider,
+        type: jobRef.type,
       },
     });
   } catch (error) {
