@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
-import { startAiGeneration } from "@/lib/ai/orchestrator";
+import { startAiGeneration, getAspectRatioForFormat } from "@/lib/ai/orchestrator";
 import { handleApiError, ApiError } from "@/lib/utils/errors";
 import { generateSpeech, captionToVoiceScript } from "@/lib/ai/elevenlabs";
+import { KlingClient } from "@/lib/ai/kling";
 
 export const maxDuration = 60;
 
@@ -98,35 +99,67 @@ export async function POST(request: Request) {
       }
     }
 
-    const jobRef = await startAiGeneration({
-      format,
-      platform,
-      promptText,
-      tone,
-      language,
-      useHashtags,
-      useEmojis,
-      referenceImageUrl,
-      referenceImageUrls,
-      aspectRatio,
-      sound: useVoice ? false : sound,
-      brandContext: brand?.ai_context ?? undefined,
-      nanoBananaKey,
-      klingKey,
-    });
+    // ── Multi-clip sequential: >1 reference images → 3 × 10s clips concatenated ──
+    const validImageUrls = (referenceImageUrls as string[] | undefined)?.filter(Boolean) ?? [];
+    const isMultiClip = isVideo && validImageUrls.length > 1;
 
-    const platformData = {
-      referenceImageUrl,
-      jobType: jobRef.type,
-      ...(voiceUrl ? { voice_url: voiceUrl } : {}),
-    };
+    let primaryJobId: string;
+    let primaryProvider: "kling" | "nano_banana";
+    let platformData: Record<string, unknown>;
+
+    if (isMultiClip && klingKey) {
+      const kling = new KlingClient(klingKey);
+      const ar = (aspectRatio ?? getAspectRatioForFormat(format, platform)) as "9:16" | "16:9" | "1:1";
+      const clips = validImageUrls.slice(0, 3);
+
+      // Start only clip 1 — remaining clips are started sequentially by the status poller
+      const clip1 = await kling.generateVideo({
+        prompt: promptText,
+        aspectRatio: ar,
+        duration: 10,
+        sound: false,
+        referenceImageUrl: clips[0],
+      });
+
+      primaryJobId = clip1.jobId;
+      primaryProvider = "kling";
+      platformData = {
+        referenceImageUrl: clips[0],
+        jobType: "video",
+        multi_clip: true,
+        image_urls: clips,
+        prompt: promptText,
+        aspect_ratio: ar,
+        clip_jobs: [
+          { scene: 1, jobId: clip1.jobId, url: null },
+          ...clips.slice(1).map((_, i) => ({ scene: i + 2, jobId: null, url: null })),
+        ],
+        ...(voiceUrl ? { voice_url: voiceUrl } : {}),
+      };
+    } else {
+      // Single-clip path (1 image or text-to-video)
+      const jobRef = await startAiGeneration({
+        format, platform, promptText, tone, language, useHashtags, useEmojis,
+        referenceImageUrl, referenceImageUrls, aspectRatio,
+        sound: useVoice ? false : sound,
+        brandContext: brand?.ai_context ?? undefined,
+        nanoBananaKey, klingKey,
+      });
+      primaryJobId = jobRef.jobId;
+      primaryProvider = jobRef.provider;
+      platformData = {
+        referenceImageUrl,
+        jobType: jobRef.type,
+        ...(voiceUrl ? { voice_url: voiceUrl } : {}),
+      };
+    }
 
     let finalPostId = postId;
 
     if (postId) {
       await admin
         .from("generated_posts")
-        .update({ ai_job_id: jobRef.jobId, ai_provider: jobRef.provider, platform_data: platformData })
+        .update({ ai_job_id: primaryJobId, ai_provider: primaryProvider, platform_data: platformData })
         .eq("id", postId);
     } else {
       const { data: newPost, error: insertError } = await admin
@@ -138,8 +171,8 @@ export async function POST(request: Request) {
           caption: null,
           hashtags: [],
           media_urls: [],
-          ai_job_id: jobRef.jobId,
-          ai_provider: jobRef.provider,
+          ai_job_id: primaryJobId,
+          ai_provider: primaryProvider,
           platform_data: { platform, ...platformData },
         })
         .select()
@@ -152,9 +185,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       data: {
         postId: finalPostId,
-        jobId: jobRef.jobId,
-        provider: jobRef.provider,
-        type: jobRef.type,
+        jobId: primaryJobId,
+        provider: primaryProvider,
+        type: isMultiClip ? "video" : platformData.jobType,
       },
     });
   } catch (error) {

@@ -18,19 +18,27 @@ async function downloadToFile(url: string, destPath: string): Promise<void> {
 export async function mergeAudioVideo(params: {
   videoUrl: string;
   audioBuffer: Buffer;
+  videoBuffer?: Buffer; // optional pre-loaded video; skips download if provided
 }): Promise<Buffer> {
   const id = randomUUID();
+  const videoPath = join(tmpdir(), `${id}_video.mp4`);
   const audioPath = join(tmpdir(), `${id}_audio.mp3`);
   const outputPath = join(tmpdir(), `${id}_merged.mp4`);
 
   try {
+    // Write video to temp file (use pre-loaded buffer or download)
+    if (params.videoBuffer) {
+      await writeFile(videoPath, params.videoBuffer);
+    } else {
+      await downloadToFile(params.videoUrl, videoPath);
+    }
     // Write audio buffer to temp file
     await writeFile(audioPath, params.audioBuffer);
 
     // Run FFmpeg merge
     await new Promise<void>((resolve, reject) => {
       ffmpeg()
-        .input(params.videoUrl)
+        .input(videoPath)
         .input(audioPath)
         // Keep original video, replace audio with ElevenLabs voice
         .addOptions(["-map 0:v", "-map 1:a", "-c:v copy", "-c:a aac", "-shortest"])
@@ -42,7 +50,7 @@ export async function mergeAudioVideo(params: {
 
     return await readFile(outputPath);
   } finally {
-    // Clean up temp files regardless of success/failure
+    await unlink(videoPath).catch(() => {});
     await unlink(audioPath).catch(() => {});
     await unlink(outputPath).catch(() => {});
   }
