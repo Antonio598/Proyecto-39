@@ -50,7 +50,6 @@ export class KlingClient {
       duration: req.duration ?? 10,
       aspect_ratio: req.aspectRatio ?? "9:16",
       sound: req.sound ?? false,
-      watermark: false,
     };
 
     if (req.negativePrompt) body.negative_prompt = req.negativePrompt;

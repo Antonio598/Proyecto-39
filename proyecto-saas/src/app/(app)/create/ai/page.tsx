@@ -404,7 +404,7 @@ export default function AiCreatePage() {
           const videoResult = await pollJobUntilDone(
             videoJson.data.jobId,
             activeWorkspaceId,
-            1800, // 30 min max — 3 clips × ~8-10 min each, sequential
+            3600, // 60 min max — 3 clips × ~10-15 min each, sequential
             (s) => setStepElapsed((p) => ({ ...p, video: s })),
           );
           if (videoResult?.mediaUrls?.[0]) {
@@ -705,7 +705,7 @@ export default function AiCreatePage() {
                         {step.id === "image"
                           ? `Generando escena ${currentScene}/3 — puede tardar 2–5 min por imagen…`
                           : step.id === "video"
-                          ? "Generando 3 clips de 10s de forma secuencial — puede tardar 15–30 min, no cierres esta ventana…"
+                          ? "Generando 3 clips de 10s de forma secuencial — puede tardar 20–45 min, no cierres esta ventana…"
                           : "Procesando…"}
                       </p>
                     )}
@@ -921,7 +921,7 @@ export default function AiCreatePage() {
           <div>
             <p className="text-sm font-medium text-indigo-800">Generando tu contenido...</p>
             <p className="text-xs text-indigo-600 mt-0.5">
-              Los videos de 3 clips pueden tardar 15–30 min (secuencial). No cierres esta ventana.
+              Los videos de 3 clips pueden tardar 20–45 min. No cierres esta ventana.
             </p>
           </div>
         </div>
