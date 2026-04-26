@@ -1,8 +1,12 @@
 import ffmpeg from "fluent-ffmpeg";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomUUID } from "crypto";
 import { writeFile, readFile, unlink } from "fs/promises";
+
+// Point fluent-ffmpeg at the static binary bundled by @ffmpeg-installer/ffmpeg
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 async function downloadToFile(url: string, destPath: string): Promise<void> {
   const res = await fetch(url);

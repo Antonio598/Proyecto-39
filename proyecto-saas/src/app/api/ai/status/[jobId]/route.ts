@@ -110,18 +110,25 @@ export async function GET(
 
       // All clips done — concatenate
       const allUrls = clipJobs.map((j) => j.url!);
-      const concatBuffer = await concatVideoClips({ videoUrls: allUrls });
+
+      let finalBuffer: Buffer;
+      try {
+        finalBuffer = await concatVideoClips({ videoUrls: allUrls });
+      } catch (concatErr) {
+        console.error("[MultiClip] concat failed:", concatErr);
+        // Fallback: use the first clip so the user gets something
+        return NextResponse.json({ data: { status: "failed", progress: null, result: null, error: `Error al concatenar clips: ${concatErr instanceof Error ? concatErr.message : "FFmpeg error"}` } });
+      }
 
       // Voice merge if applicable
       const voiceUrl = post.platform_data?.voice_url as string | undefined;
-      let finalBuffer = concatBuffer;
 
       if (voiceUrl) {
         try {
           const audioRes = await fetch(voiceUrl);
           if (audioRes.ok) {
             const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-            finalBuffer = await mergeAudioVideo({ videoUrl: "", audioBuffer, videoBuffer: concatBuffer });
+            finalBuffer = await mergeAudioVideo({ videoUrl: "", audioBuffer, videoBuffer: finalBuffer });
           }
         } catch { /* fallback to concat without voice */ }
       }
