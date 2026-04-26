@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/publish", "schedule": "* * * * *" },
+    { "path": "/api/cron/process-videos", "schedule": "* * * * *" },
     { "path": "/api/cron/automation", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/sync-metrics", "schedule": "0 6 * * *" },
     { "path": "/api/cron/refresh-tokens", "schedule": "0 3 * * 0" }
