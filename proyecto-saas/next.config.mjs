@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  serverExternalPackages: ["fluent-ffmpeg", "@ffmpeg-installer/ffmpeg"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co" },
@@ -15,6 +14,7 @@ const nextConfig = {
     ],
   },
   experimental: {
+    serverComponentsExternalPackages: ["fluent-ffmpeg"],
     serverActions: {
       allowedOrigins: ["localhost:3000", process.env.NEXT_PUBLIC_APP_URL ?? ""],
     },
