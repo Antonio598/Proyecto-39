@@ -1,11 +1,8 @@
-// Internal cron scheduler — runs once when the Next.js server boots (Docker/Easypanel).
-// Replaces the need to configure cron jobs manually in Easypanel or Vercel.
+// Internal scheduler — runs once when the Next.js server boots (Docker/Easypanel).
+// Uses only setInterval (no external deps) so webpack can bundle it without issues.
 
 export async function register() {
-  // Only in the Node.js runtime (not Edge, not during next build)
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-
-  const cron = (await import("node-cron")).default;
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const secret = process.env.CRON_SECRET;
@@ -21,20 +18,27 @@ export async function register() {
       cache: "no-store",
     }).catch((e: unknown) => console.error(`[Cron] ${path} error:`, e));
 
-  // Publish scheduled posts — every minute
-  cron.schedule("* * * * *", () => call("/api/cron/publish"));
+  // Every minute: publish scheduled posts + advance pending video jobs
+  setInterval(() => {
+    call("/api/cron/publish");
+    call("/api/cron/process-videos");
+  }, 60_000);
 
-  // Process pending Kling video jobs — every minute (runs in background even if page is closed)
-  cron.schedule("* * * * *", () => call("/api/cron/process-videos"));
+  // Every 15 minutes: automation content rules
+  setInterval(() => {
+    call("/api/cron/automation");
+  }, 15 * 60_000);
 
-  // Automation content rules — every 15 minutes
-  cron.schedule("*/15 * * * *", () => call("/api/cron/automation"));
+  // Every hour: check if daily/weekly jobs should run
+  setInterval(() => {
+    const now = new Date();
+    const h = now.getUTCHours();
+    const m = now.getUTCMinutes();
+    const d = now.getUTCDay(); // 0 = Sunday
 
-  // Daily metrics sync — 6 AM UTC
-  cron.schedule("0 6 * * *", () => call("/api/cron/sync-metrics"));
+    if (h === 6 && m < 5) call("/api/cron/sync-metrics");
+    if (d === 0 && h === 3 && m < 5) call("/api/cron/refresh-tokens");
+  }, 60 * 60_000);
 
-  // Weekly token refresh — Sunday 3 AM UTC
-  cron.schedule("0 3 * * 0", () => call("/api/cron/refresh-tokens"));
-
-  console.log("[Cron] Internal scheduler active — all jobs registered");
+  console.log("[Cron] Internal scheduler active — publish, process-videos, automation, metrics, tokens");
 }
