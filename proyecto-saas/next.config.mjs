@@ -15,7 +15,7 @@ const nextConfig = {
   },
   experimental: {
     instrumentationHook: true,
-    serverComponentsExternalPackages: ["fluent-ffmpeg"],
+    serverComponentsExternalPackages: ["fluent-ffmpeg", "node-cron"],
     serverActions: {
       allowedOrigins: ["localhost:3000", process.env.NEXT_PUBLIC_APP_URL ?? ""],
     },
