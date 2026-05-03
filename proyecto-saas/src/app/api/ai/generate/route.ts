@@ -98,10 +98,6 @@ export async function POST(request: Request) {
       }
     }
 
-    let primaryJobId: string;
-    let primaryProvider: "kling" | "nano_banana";
-    let platformData: Record<string, unknown>;
-
     const jobRef = await startAiGeneration({
       format, platform, promptText, tone, language, useHashtags, useEmojis,
       referenceImageUrl, referenceImageUrls, aspectRatio,
@@ -109,9 +105,9 @@ export async function POST(request: Request) {
       brandContext: brand?.ai_context ?? undefined,
       nanoBananaKey, klingKey,
     });
-    primaryJobId = jobRef.jobId;
-    primaryProvider = jobRef.provider;
-    platformData = {
+    const primaryJobId = jobRef.jobId;
+    const primaryProvider = jobRef.provider;
+    const platformData: Record<string, unknown> = {
       referenceImageUrl,
       jobType: jobRef.type,
       ...(voiceUrl ? { voice_url: voiceUrl } : {}),
