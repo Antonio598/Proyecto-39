@@ -15,12 +15,14 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
 
   // Find all pending Kling jobs (no media yet, created within 48h to skip dead jobs)
+  // Use .cs("{}") — "contains empty set" is false for non-empty arrays, not what we want.
+  // Safest approach: filter media_urls IS NULL or media_urls = '{}' using .or()
   const { data: posts, error } = await admin
     .from("generated_posts")
     .select("id, workspace_id, ai_provider, ai_job_id, media_urls, caption, hashtags, platform_data")
     .eq("ai_provider", "kling")
     .not("ai_job_id", "is", null)
-    .eq("media_urls", "{}")
+    .or("media_urls.is.null,media_urls.eq.{}")
     .gte("created_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
     .limit(5); // Cap per invocation — remaining jobs picked up next minute
 
