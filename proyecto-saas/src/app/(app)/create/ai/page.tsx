@@ -63,7 +63,7 @@ interface FinalResult {
 const PIPELINE_STEPS: PipelineStep[] = [
   { id: "script", label: "Guión y copy", sublabel: "GPT-4o mini", emoji: "🤖" },
   { id: "image", label: "Imagen", sublabel: "Nano Banana", emoji: "🍌" },
-  { id: "video", label: "Video (~30s)", sublabel: "Kling AI × 3 clips", emoji: "🎬" },
+  { id: "video", label: "Video (~10s)", sublabel: "Kling AI", emoji: "🎬" },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -404,7 +404,7 @@ export default function AiCreatePage() {
           const videoResult = await pollJobUntilDone(
             videoJson.data.jobId,
             activeWorkspaceId,
-            3600, // 60 min max — 3 clips × ~10-15 min each, sequential
+            1800, // 30 min max
             (s) => setStepElapsed((p) => ({ ...p, video: s })),
           );
           if (videoResult?.mediaUrls?.[0]) {
@@ -705,7 +705,7 @@ export default function AiCreatePage() {
                         {step.id === "image"
                           ? `Generando escena ${currentScene}/3 — puede tardar 2–5 min por imagen…`
                           : step.id === "video"
-                          ? "Generando 3 clips de 10s de forma secuencial — puede tardar 20–45 min, no cierres esta ventana…"
+                          ? "Generando video con Kling AI — puede tardar 5–15 min…"
                           : "Procesando…"}
                       </p>
                     )}
@@ -921,7 +921,7 @@ export default function AiCreatePage() {
           <div>
             <p className="text-sm font-medium text-indigo-800">Generando tu contenido...</p>
             <p className="text-xs text-indigo-600 mt-0.5">
-              Los videos de 3 clips pueden tardar 20–45 min. No cierres esta ventana.
+              Los videos pueden tardar 5–15 min. No cierres esta ventana.
             </p>
           </div>
         </div>
