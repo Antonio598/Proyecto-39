@@ -8,7 +8,7 @@ import { useUiStore } from "@/store/ui.store";
 import {
   LayoutDashboard, Calendar, ImageIcon, Sparkles,
   CheckSquare, Zap, BarChart2, Palette, Settings,
-  ChevronLeft, ChevronRight, Users, Link2, KeyRound,
+  ChevronLeft, ChevronRight, Users, Link2, KeyRound, Activity,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/accounts", label: "Cuentas sociales", icon: Link2 },
   { href: "/automation", label: "Automatización", icon: Zap },
   { href: "/analytics", label: "Analíticas", icon: BarChart2 },
+  { href: "/logs", label: "Registros", icon: Activity },
 ];
 
 const BOTTOM_ITEMS = [
