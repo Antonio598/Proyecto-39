@@ -60,10 +60,8 @@ export class KlingClient {
     } else if (imageUrls.length === 1) {
       type = "std-image-to-video";
       body.image = imageUrls[0];
-      body.cfg_scale = 0.5;
     } else {
       type = "std-text-to-video";
-      body.cfg_scale = 0.5;
     }
 
     body.type = type;
