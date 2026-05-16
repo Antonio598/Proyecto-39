@@ -45,7 +45,6 @@ export async function GET(request: Request) {
       duration: 3,
       aspect_ratio: "1:1",
       sound: false,
-      cfg_scale: 0.5,
     };
 
     const genRes = await fetch(`${BASE_URL}/api/generate`, {

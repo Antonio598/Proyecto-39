@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
-import { KeyRound, Save, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle } from "lucide-react";
+import { KeyRound, Save, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle, Wifi } from "lucide-react";
 import { toast } from "sonner";
 
 interface KeyField {
@@ -81,8 +81,9 @@ export default function IntegrationsPage() {
   });
   const [show, setShow] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [klingTest, setKlingTest] = useState<"idle" | "testing" | "ok" | "error">("idle");
+  const [klingTestMsg, setKlingTestMsg] = useState("");
 
-  // Load which keys are already configured
   useEffect(() => {
     if (!activeWorkspaceId) return;
     fetch("/api/brand", { headers: { "x-workspace-id": activeWorkspaceId } })
@@ -102,6 +103,37 @@ export default function IntegrationsPage() {
 
   function toggleShow(id: string) {
     setShow((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  async function testKling() {
+    if (!activeWorkspaceId) return;
+    setKlingTest("testing");
+    setKlingTestMsg("");
+    try {
+      const res = await fetch("/api/ai/kling-debug", {
+        headers: { "x-workspace-id": activeWorkspaceId },
+      });
+      const json = await res.json() as Record<string, unknown>;
+      const raw = json.raw as Record<string, unknown> | undefined;
+      const data = raw?.data as Record<string, unknown> | undefined;
+      const taskId = data?.task_id as string | undefined;
+
+      if (res.ok && taskId) {
+        setKlingTest("ok");
+        setKlingTestMsg(`✅ Conexión OK — task_id: ${taskId}`);
+      } else {
+        setKlingTest("error");
+        const errMsg =
+          (json.error as string | undefined) ??
+          (raw?.message as string | undefined) ??
+          (raw?.error as string | undefined) ??
+          `HTTP ${res.status} — ${JSON.stringify(raw ?? json).slice(0, 120)}`;
+        setKlingTestMsg(`❌ ${errMsg}`);
+      }
+    } catch (err) {
+      setKlingTest("error");
+      setKlingTestMsg(`❌ ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   if (loading) {
@@ -138,6 +170,9 @@ export default function IntegrationsPage() {
       });
       setSaved(newSaved);
       setKeys({ openaiKey: "", nanoBananaKey: "", klingKey: "", elevenLabsKey: "" });
+      // Reset test state when key is updated
+      setKlingTest("idle");
+      setKlingTestMsg("");
     } else {
       toast.error("Error al guardar las API keys");
     }
@@ -226,7 +261,32 @@ export default function IntegrationsPage() {
                 {show[id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+
             <p className="text-xs text-muted-foreground">{description}</p>
+
+            {/* Kling test button */}
+            {id === "klingKey" && saved[id] && (
+              <div className="mt-3 pt-3 border-t border-purple-100">
+                <button
+                  type="button"
+                  onClick={testKling}
+                  disabled={klingTest === "testing"}
+                  className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 disabled:opacity-60 transition-colors"
+                >
+                  {klingTest === "testing" ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Wifi className="w-3 h-3" />
+                  )}
+                  {klingTest === "testing" ? "Probando conexión…" : "Probar conexión con Kling"}
+                </button>
+                {klingTestMsg && (
+                  <p className={`text-xs mt-1.5 font-mono break-all ${klingTest === "ok" ? "text-green-700" : "text-red-600"}`}>
+                    {klingTestMsg}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         ))}
 
