@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
-import { startAiGeneration } from "@/lib/ai/orchestrator";
+import { startAiGeneration, getAspectRatioForFormat } from "@/lib/ai/orchestrator";
+import { KlingClient } from "@/lib/ai/kling";
 import { handleApiError, ApiError } from "@/lib/utils/errors";
 import { generateSpeech, captionToVoiceScript } from "@/lib/ai/elevenlabs";
 
@@ -98,20 +99,58 @@ export async function POST(request: Request) {
       }
     }
 
-    const jobRef = await startAiGeneration({
-      format, platform, promptText, tone, language, useHashtags, useEmojis,
-      referenceImageUrl, referenceImageUrls, aspectRatio,
-      sound: useVoice ? false : sound,
-      brandContext: brand?.ai_context ?? undefined,
-      nanoBananaKey, klingKey,
-    });
-    const primaryJobId = jobRef.jobId;
-    const primaryProvider = jobRef.provider;
-    const platformData: Record<string, unknown> = {
-      referenceImageUrl,
-      jobType: jobRef.type,
-      ...(voiceUrl ? { voice_url: voiceUrl } : {}),
-    };
+    // ── Multi-clip video: 3 × 10s = 30s with frame continuity ──────────────────
+    // Clip 1 starts from reference image. Clips 2-3 start from the last frame of
+    // the previous clip (extracted by video-processor when each clip completes).
+    let primaryJobId: string;
+    let primaryProvider: "kling" | "nano_banana";
+    let platformData: Record<string, unknown>;
+
+    if (isVideo && klingKey) {
+      const kling = new KlingClient(klingKey);
+      const ar = (aspectRatio ?? getAspectRatioForFormat(format, platform)) as "9:16" | "16:9" | "1:1";
+      const validImageUrls = (referenceImageUrls as string[] | undefined)?.filter(Boolean) ?? [];
+      const firstImage = validImageUrls[0] ?? (referenceImageUrl as string | undefined);
+
+      const clip1 = await kling.generateVideo({
+        prompt: promptText,
+        aspectRatio: ar,
+        duration: 10,
+        sound: false,
+        referenceImageUrl: firstImage,
+      });
+
+      primaryJobId = clip1.jobId;
+      primaryProvider = "kling";
+      platformData = {
+        jobType: "video",
+        multi_clip: true,
+        prompt: promptText,
+        aspect_ratio: ar,
+        referenceImageUrl: firstImage,
+        clip_jobs: [
+          { scene: 1, jobId: clip1.jobId, url: null },
+          { scene: 2, jobId: null, url: null },
+          { scene: 3, jobId: null, url: null },
+        ],
+        ...(voiceUrl ? { voice_url: voiceUrl } : {}),
+      };
+    } else {
+      const jobRef = await startAiGeneration({
+        format, platform, promptText, tone, language, useHashtags, useEmojis,
+        referenceImageUrl, referenceImageUrls, aspectRatio,
+        sound: useVoice ? false : sound,
+        brandContext: brand?.ai_context ?? undefined,
+        nanoBananaKey, klingKey,
+      });
+      primaryJobId = jobRef.jobId;
+      primaryProvider = jobRef.provider;
+      platformData = {
+        referenceImageUrl,
+        jobType: jobRef.type,
+        ...(voiceUrl ? { voice_url: voiceUrl } : {}),
+      };
+    }
 
     let finalPostId = postId;
 
@@ -146,7 +185,7 @@ export async function POST(request: Request) {
         postId: finalPostId,
         jobId: primaryJobId,
         provider: primaryProvider,
-        type: platformData.jobType,
+        type: (platformData.jobType as string | undefined) ?? "video",
       },
     });
   } catch (error) {

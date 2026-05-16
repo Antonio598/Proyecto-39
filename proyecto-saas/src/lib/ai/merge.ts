@@ -58,6 +58,44 @@ export async function mergeAudioVideo(params: {
 }
 
 /**
+ * Extract the last frame of a video as a JPEG buffer.
+ * Seeks to second 8 (near end of a 10s Kling clip) for reliability.
+ */
+export async function extractLastFrame(params: {
+  videoUrl?: string;
+  videoBuffer?: Buffer;
+}): Promise<Buffer> {
+  const id = randomUUID();
+  const videoPath = join(tmpdir(), `${id}_src.mp4`);
+  const framePath = join(tmpdir(), `${id}_frame.jpg`);
+
+  try {
+    if (params.videoBuffer) {
+      await writeFile(videoPath, params.videoBuffer);
+    } else if (params.videoUrl) {
+      await downloadToFile(params.videoUrl, videoPath);
+    } else {
+      throw new Error("extractLastFrame: need videoUrl or videoBuffer");
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(videoPath)
+        .seekInput(8) // 8s into a 10s clip — reliable near-end frame
+        .outputOptions(["-vframes 1", "-q:v 2"])
+        .output(framePath)
+        .on("end", () => resolve())
+        .on("error", (err) => reject(new Error(`FFmpeg frame extract: ${err.message}`)))
+        .run();
+    });
+
+    return await readFile(framePath);
+  } finally {
+    await unlink(videoPath).catch(() => {});
+    await unlink(framePath).catch(() => {});
+  }
+}
+
+/**
  * Concatenate multiple remote video clips into a single MP4 using FFmpeg concat demuxer.
  * All clips must have compatible codecs (guaranteed when all come from the same Kling config).
  * Returns the concatenated MP4 as a Buffer.
