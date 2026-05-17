@@ -36,6 +36,41 @@ const IMAGE_FORMATS: PostFormat[] = ["image", "carousel", "story"];
 type StepId = "script" | "image" | "video";
 type StepStatus = "pending" | "running" | "done" | "skipped" | "error" | "background";
 
+interface SavedVideoJob {
+  postId: string;
+  jobId: string;
+  caption: string;
+  hashtags: string[];
+  imageUrl?: string;
+  savedAt: number;
+}
+
+function pendingJobKey(workspaceId: string) {
+  return `ai-pending-job-${workspaceId}`;
+}
+
+function savePendingJob(workspaceId: string, job: SavedVideoJob) {
+  try { localStorage.setItem(pendingJobKey(workspaceId), JSON.stringify(job)); } catch { /* ignore */ }
+}
+
+function loadPendingJob(workspaceId: string): SavedVideoJob | null {
+  try {
+    const raw = localStorage.getItem(pendingJobKey(workspaceId));
+    if (!raw) return null;
+    const job = JSON.parse(raw) as SavedVideoJob;
+    // Discard jobs older than 48 hours
+    if (Date.now() - job.savedAt > 48 * 60 * 60 * 1000) {
+      localStorage.removeItem(pendingJobKey(workspaceId));
+      return null;
+    }
+    return job;
+  } catch { return null; }
+}
+
+function clearPendingJob(workspaceId: string) {
+  try { localStorage.removeItem(pendingJobKey(workspaceId)); } catch { /* ignore */ }
+}
+
 interface PipelineStep {
   id: StepId;
   label: string;
@@ -143,6 +178,9 @@ export default function AiCreatePage() {
   const [currentScene, setCurrentScene] = useState<number>(0); // which scene is being generated
   const [finalResult, setFinalResult] = useState<FinalResult | null>(null);
 
+  // Pending job restored from localStorage (video processing that outlived the page)
+  const [pendingJob, setPendingJob] = useState<SavedVideoJob | null>(null);
+
   const isVideo = VIDEO_FORMATS.includes(format);
   const isImage = IMAGE_FORMATS.includes(format);
   const availableFormats = PLATFORM_FORMATS[platform] ?? [];
@@ -178,6 +216,13 @@ export default function AiCreatePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform]);
 
+  // Restore pending video job from localStorage when the workspace is known
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    const saved = loadPendingJob(activeWorkspaceId);
+    if (saved) setPendingJob(saved);
+  }, [activeWorkspaceId]);
+
   const selectedAsset = photoAssets.find((a) => a.id === selectedAssetId);
   const filteredAccounts = accounts.filter((a) => a.platform === platform && a.is_active);
 
@@ -192,6 +237,8 @@ export default function AiCreatePage() {
     : "1:1";
 
   function resetPipeline() {
+    if (activeWorkspaceId) clearPendingJob(activeWorkspaceId);
+    setPendingJob(null);
     setRunning(false);
     setStepStatus({ script: "pending", image: "pending", video: "pending" });
     setStepError({});
@@ -201,6 +248,44 @@ export default function AiCreatePage() {
     setCurrentScene(0);
     setFinalResult(null);
     setShowScheduleModal(false);
+  }
+
+  async function resumeJob(job: SavedVideoJob) {
+    if (!activeWorkspaceId) return;
+    setPendingJob(null);
+    setRunning(true);
+    setStepStatus({ script: "done", image: "done", video: "running" });
+    setStepElapsed({});
+
+    const videoResult = await pollJobUntilDone(
+      job.jobId,
+      activeWorkspaceId,
+      3600,
+      (s) => setStepElapsed((p) => ({ ...p, video: s })),
+    );
+
+    if (videoResult?.mediaUrls?.[0]) {
+      clearPendingJob(activeWorkspaceId);
+      setStep("video", "done");
+      toast.success("Video generado ✓");
+      setFinalResult({
+        postId: job.postId,
+        caption: job.caption,
+        hashtags: job.hashtags,
+        imageUrl: job.imageUrl,
+        videoUrl: videoResult.mediaUrls[0],
+      });
+    } else if (videoResult?.error) {
+      clearPendingJob(activeWorkspaceId);
+      setStep("video", "error", videoResult.error);
+      setFinalResult({ postId: job.postId, caption: job.caption, hashtags: job.hashtags, imageUrl: job.imageUrl });
+    } else {
+      // Still processing — keep in localStorage for next visit
+      setStep("video", "background");
+      toast.info("El video sigue procesándose. Vuelve en unos minutos.");
+      setFinalResult({ postId: job.postId, caption: job.caption, hashtags: job.hashtags, imageUrl: job.imageUrl });
+    }
+    setRunning(false);
   }
 
   async function publishNow() {
@@ -401,6 +486,16 @@ export default function AiCreatePage() {
         if (!videoRes.ok) {
           setStep("video", "error", videoJson.error ?? "Error al generar video");
         } else {
+          // Persist job so the user can resume if they navigate away
+          savePendingJob(activeWorkspaceId, {
+            postId: script.postId,
+            jobId: videoJson.data.jobId,
+            caption: script.caption,
+            hashtags: script.hashtags,
+            imageUrl: generatedUrls[0],
+            savedAt: Date.now(),
+          });
+
           const videoResult = await pollJobUntilDone(
             videoJson.data.jobId,
             activeWorkspaceId,
@@ -408,13 +503,15 @@ export default function AiCreatePage() {
             (s) => setStepElapsed((p) => ({ ...p, video: s })),
           );
           if (videoResult?.mediaUrls?.[0]) {
+            clearPendingJob(activeWorkspaceId);
             videoUrl = videoResult.mediaUrls[0];
             setStep("video", "done");
             toast.success("Video generado ✓");
           } else if (videoResult?.error) {
+            clearPendingJob(activeWorkspaceId);
             setStep("video", "error", videoResult.error);
           } else {
-            // Timeout — cron is still processing in the background
+            // Timeout — cron is still processing; keep localStorage so user can resume
             setStep("video", "background");
             toast.info("El video sigue procesándose. Puedes cerrar esta página.");
           }
@@ -461,6 +558,34 @@ export default function AiCreatePage() {
           Describe tu idea → GPT genera el guión → Nano Banana crea la imagen → Kling hace el video
         </p>
       </div>
+
+      {/* Pending job banner — shown when a video job is still in progress from a previous visit */}
+      {pendingJob && !running && !finalResult && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-amber-800 text-sm">Video en proceso</p>
+            <p className="text-xs text-amber-700 mt-0.5 truncate">{pendingJob.caption.slice(0, 80)}…</p>
+            <p className="text-xs text-amber-600 mt-1">El cron sigue procesando tu video. Haz clic en &quot;Ver progreso&quot; para comprobar si ya terminó.</p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => resumeJob(pendingJob)}
+              className="text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              Ver progreso
+            </button>
+            <button
+              type="button"
+              onClick={() => { clearPendingJob(activeWorkspaceId!); setPendingJob(null); }}
+              className="text-xs border border-amber-300 text-amber-700 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors"
+            >
+              Descartar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Form */}
       {!running && !finalResult && (
