@@ -14,11 +14,11 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient();
 
-  // Find all pending Kling jobs (no media yet, not permanently failed, created within 48h)
+  // Find all pending AI jobs (Kling video + Nano Banana image), no media yet, created within 48h
   const { data: posts, error } = await admin
     .from("generated_posts")
     .select("id, workspace_id, ai_provider, ai_job_id, media_urls, caption, hashtags, platform_data")
-    .eq("ai_provider", "kling")
+    .in("ai_provider", ["kling", "nano_banana"])
     .not("ai_job_id", "is", null)
     .or("media_urls.is.null,media_urls.eq.{}")
     .gte("created_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
@@ -45,17 +45,22 @@ export async function GET(request: Request) {
         .eq("workspace_id", post.workspace_id)
         .maybeSingle();
 
-      if (!brand?.kling_key) {
+      const needsKling = post.ai_provider === "kling";
+      if (needsKling && !brand?.kling_key) {
         results.push({ postId: post.id, status: "skipped", error: "no kling_key" });
+        continue;
+      }
+      if (!needsKling && !brand?.nano_banana_key) {
+        results.push({ postId: post.id, status: "skipped", error: "no nano_banana_key" });
         continue;
       }
 
       const result = await processKlingJob(
         post as unknown as GeneratedPostRow,
-        brand.kling_key,
+        brand?.kling_key ?? "",
         post.workspace_id,
         admin,
-        brand.nano_banana_key ?? undefined,
+        brand?.nano_banana_key ?? undefined,
       );
 
       console.log(`[CronVideos] post ${post.id} → ${result.status}`);
