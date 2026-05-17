@@ -5,11 +5,11 @@ import { getProfileGroupId } from "@/lib/postproxy";
 
 export async function POST(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ workspaceId: string }> }
 ) {
   try {
     await requireAuth();
-    const { id: workspaceId } = await params;
+    const { workspaceId } = await params;
 
     const groupId = await getProfileGroupId();
 
