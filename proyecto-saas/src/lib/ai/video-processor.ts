@@ -70,6 +70,11 @@ async function runMultiClipStep(
     }).eq("id", post.id);
   };
 
+  const failJob = async (errMsg: string) => {
+    await saveState({ job_failed: true, job_error: errMsg });
+    return { status: "failed" as const, error: errMsg };
+  };
+
   const activeClip = clipJobs.find((j) => j.jobId && !j.url);
   const completedCount = clipJobs.filter((j) => j.url).length;
 
@@ -88,7 +93,7 @@ async function runMultiClipStep(
     const msg = err instanceof Error ? err.message : String(err);
     log("error", `Error al consultar status de clip ${activeClip.scene}: ${msg}`);
     await saveState();
-    return { status: "failed", error: msg };
+    return { status: "processing", progress: completedCount * 33 };
   }
 
   log(
@@ -97,8 +102,9 @@ async function runMultiClipStep(
   );
 
   if (clipStatus.status === "failed") {
-    await saveState();
-    return { status: "failed", error: clipStatus.error ?? "Clip falló en Kling" };
+    const errMsg = clipStatus.error ?? "Clip falló en Kling";
+    log("error", `Clip ${activeClip.scene} falló: ${errMsg}`);
+    return failJob(errMsg);
   }
 
   if (clipStatus.status !== "completed" || !clipStatus.videoUrl) {
@@ -113,7 +119,6 @@ async function runMultiClipStep(
   const nextClip = clipJobs.find((j) => !j.jobId);
 
   if (nextClip) {
-    // Extract last frame of the completed clip to use as starting frame of next clip
     let referenceImageUrl: string | undefined;
     try {
       log("info", `Extrayendo último frame de clip ${activeClip.scene} para continuidad…`);
@@ -135,7 +140,6 @@ async function runMultiClipStep(
       log("warn", `Frame extraction falló: ${err instanceof Error ? err.message : String(err)} — continuando sin frame`);
     }
 
-    // Start next clip
     let newJob;
     try {
       log("info", `Iniciando clip ${nextClip.scene}${referenceImageUrl ? " (desde último frame)" : " (sin frame)"}`);
@@ -152,7 +156,7 @@ async function runMultiClipStep(
       const msg = err instanceof Error ? err.message : String(err);
       log("error", `Error al iniciar clip ${nextClip.scene}: ${msg}`);
       await saveState({ clip_jobs: clipJobs });
-      return { status: "failed", error: `No se pudo iniciar clip ${nextClip.scene}: ${msg}` };
+      return failJob(`No se pudo iniciar clip ${nextClip.scene}: ${msg}`);
     }
 
     await saveState({ clip_jobs: clipJobs });
@@ -171,7 +175,7 @@ async function runMultiClipStep(
     const msg = err instanceof Error ? err.message : String(err);
     log("error", `FFmpeg concat falló: ${msg}`);
     await saveState({ clip_jobs: clipJobs });
-    return { status: "failed", error: `FFmpeg concat: ${msg}` };
+    return failJob(`FFmpeg concat: ${msg}`);
   }
 
   // Optional voice merge
@@ -202,7 +206,7 @@ async function runMultiClipStep(
   if (uploadErr) {
     log("error", `Error subiendo a Storage: ${uploadErr.message}`);
     await saveState({ clip_jobs: clipJobs });
-    return { status: "failed", error: "Error subiendo video final a Storage" };
+    return failJob("Error subiendo video final a Storage");
   }
 
   const { data: { publicUrl } } = admin.storage.from("workspace-media").getPublicUrl(finalPath);
@@ -243,7 +247,14 @@ async function runSingleClipStep(
     post.platform_data as { referenceImageUrl?: string; jobType?: string } | undefined,
   );
 
-  if (jobStatus.status === "failed") return { status: "failed", error: jobStatus.error ?? "Falló" };
+  if (jobStatus.status === "failed") {
+    const errMsg = jobStatus.error ?? "Falló";
+    await admin.from("generated_posts").update({
+      platform_data: { ...(post.platform_data ?? {}), job_failed: true, job_error: errMsg },
+    }).eq("id", post.id);
+    return { status: "failed", error: errMsg };
+  }
+
   if (jobStatus.status !== "completed") return { status: "processing", progress: 50 };
 
   const updates: Record<string, unknown> = {};

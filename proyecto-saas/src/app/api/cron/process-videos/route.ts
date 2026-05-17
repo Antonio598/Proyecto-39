@@ -14,9 +14,7 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient();
 
-  // Find all pending Kling jobs (no media yet, created within 48h to skip dead jobs)
-  // Use .cs("{}") — "contains empty set" is false for non-empty arrays, not what we want.
-  // Safest approach: filter media_urls IS NULL or media_urls = '{}' using .or()
+  // Find all pending Kling jobs (no media yet, not permanently failed, created within 48h)
   const { data: posts, error } = await admin
     .from("generated_posts")
     .select("id, workspace_id, ai_provider, ai_job_id, media_urls, caption, hashtags, platform_data")
@@ -34,8 +32,13 @@ export async function GET(request: Request) {
   const results: { postId: string; status: string; error?: string }[] = [];
 
   for (const post of posts ?? []) {
+    // Skip jobs permanently marked as failed — no point retrying
+    if ((post.platform_data as Record<string, unknown> | null)?.job_failed) {
+      results.push({ postId: post.id, status: "skipped", error: "job marked as failed" });
+      continue;
+    }
+
     try {
-      // Get the Kling API key for this workspace
       const { data: brand } = await admin
         .from("brand_settings")
         .select("kling_key, nano_banana_key")

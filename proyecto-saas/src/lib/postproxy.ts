@@ -11,7 +11,7 @@ function headers() {
 export type PostproxyPlatform = "facebook" | "instagram" | "linkedin" | "tiktok" | "youtube";
 
 /** Get the profile group ID — uses env var if set, otherwise first group */
-async function getProfileGroupId(): Promise<string> {
+export async function getProfileGroupId(): Promise<string> {
   if (process.env.POSTPROXY_PROFILE_GROUP_ID) {
     return process.env.POSTPROXY_PROFILE_GROUP_ID;
   }

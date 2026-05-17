@@ -34,7 +34,7 @@ const IMAGE_FORMATS: PostFormat[] = ["image", "carousel", "story"];
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type StepId = "script" | "image" | "video";
-type StepStatus = "pending" | "running" | "done" | "skipped" | "error";
+type StepStatus = "pending" | "running" | "done" | "skipped" | "error" | "background";
 
 interface PipelineStep {
   id: StepId;
@@ -411,9 +411,12 @@ export default function AiCreatePage() {
             videoUrl = videoResult.mediaUrls[0];
             setStep("video", "done");
             toast.success("Video generado ✓");
+          } else if (videoResult?.error) {
+            setStep("video", "error", videoResult.error);
           } else {
-            const errMsg = videoResult?.error ?? "Kling: tiempo de espera agotado";
-            setStep("video", "error", errMsg);
+            // Timeout — cron is still processing in the background
+            setStep("video", "background");
+            toast.info("El video sigue procesándose. Puedes cerrar esta página.");
           }
         }
       } else if (isVideo && skipVideo) {
@@ -664,11 +667,13 @@ export default function AiCreatePage() {
                         status === "running" ? "bg-indigo-100 animate-pulse" :
                         status === "done" ? "bg-emerald-100" :
                         status === "error" ? "bg-red-100" :
+                        status === "background" ? "bg-amber-100" :
                         status === "skipped" ? "bg-gray-100" : "bg-muted"
                       )}>
                         {status === "running" ? <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" /> :
                          status === "done" ? <CheckCircle className="w-4 h-4 text-emerald-600" /> :
                          status === "error" ? <AlertCircle className="w-4 h-4 text-red-500" /> :
+                         status === "background" ? <Clock className="w-4 h-4 text-amber-600" /> :
                          step.emoji}
                       </div>
                       <div className="flex-1">
@@ -677,6 +682,7 @@ export default function AiCreatePage() {
                           status === "running" ? "text-indigo-700" :
                           status === "done" ? "text-emerald-700" :
                           status === "error" ? "text-red-600" :
+                          status === "background" ? "text-amber-700" :
                           "text-muted-foreground"
                         )}>
                           {step.label}
@@ -688,6 +694,7 @@ export default function AiCreatePage() {
                         status === "running" ? "bg-indigo-50 text-indigo-700" :
                         status === "done" ? "bg-emerald-50 text-emerald-700" :
                         status === "error" ? "bg-red-50 text-red-700" :
+                        status === "background" ? "bg-amber-50 text-amber-700" :
                         status === "skipped" ? "bg-gray-100 text-gray-500" :
                         "bg-muted text-muted-foreground"
                       )}>
@@ -697,6 +704,7 @@ export default function AiCreatePage() {
                             : "Iniciando..."
                           : status === "done" ? "✓ Listo"
                           : status === "error" ? "Error"
+                          : status === "background" ? "En segundo plano"
                           : status === "skipped" ? "Omitido" : "Pendiente"}
                       </span>
                     </div>
@@ -707,6 +715,11 @@ export default function AiCreatePage() {
                           : step.id === "video"
                           ? "Generando 3 clips de 10s con continuidad entre ellos — puede tardar 20–45 min…"
                           : "Procesando…"}
+                      </p>
+                    )}
+                    {status === "background" && step.id === "video" && (
+                      <p className="text-xs text-amber-700 mt-1 ml-12">
+                        El video sigue procesándose en segundo plano. Puedes cerrar esta página — el cron lo completará solo y estará disponible en tu biblioteca.
                       </p>
                     )}
                     {errMsg && (

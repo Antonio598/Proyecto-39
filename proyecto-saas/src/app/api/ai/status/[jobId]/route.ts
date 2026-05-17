@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/utils/errors";
-import { processKlingJob, type GeneratedPostRow } from "@/lib/ai/video-processor";
 
-export const maxDuration = 120;
+export const maxDuration = 30;
 
+// Read-only status endpoint — the cron job (/api/cron/process-videos) does all
+// the actual processing. This endpoint just reads DB state so the browser can
+// poll without racing against the background worker.
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ jobId: string }> }
@@ -17,7 +19,7 @@ export async function GET(
 
     const { data: post } = await admin
       .from("generated_posts")
-      .select("*")
+      .select("id, caption, hashtags, media_urls, platform_data")
       .eq("workspace_id", workspaceId)
       .eq("ai_job_id", jobId)
       .single();
@@ -26,7 +28,7 @@ export async function GET(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    // Fast-path: already completed
+    // Completed — media is ready
     if (post.media_urls?.length > 0) {
       return NextResponse.json({
         data: {
@@ -43,46 +45,33 @@ export async function GET(
       });
     }
 
-    const { data: brand } = await admin
-      .from("brand_settings")
-      .select("nano_banana_key, kling_key")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
+    const pd = post.platform_data as Record<string, unknown> | null;
 
-    // Delegate to shared processor (same logic used by the background cron)
-    const result = await processKlingJob(
-      post as unknown as GeneratedPostRow,
-      brand?.kling_key ?? "",
-      workspaceId,
-      admin,
-      brand?.nano_banana_key ?? undefined,
-    );
-
-    if (result.status === "completed") {
+    // Permanently failed — marked by background processor so cron stops retrying
+    if (pd?.job_failed) {
       return NextResponse.json({
         data: {
-          status: "completed",
-          progress: 100,
-          result: {
-            postId: post.id,
-            mediaUrls: result.mediaUrls,
-            caption: result.caption,
-            hashtags: result.hashtags,
-          },
-          error: null,
+          status: "failed",
+          progress: null,
+          result: null,
+          error: (pd.job_error as string | undefined) ?? "El video falló",
         },
       });
     }
 
-    if (result.status === "failed") {
+    // Multi-clip: derive progress from clip_jobs array in platform_data
+    if (pd?.multi_clip) {
+      const clipJobs = (pd.clip_jobs ?? []) as Array<{ scene: number; jobId: string | null; url: string | null }>;
+      const completedCount = clipJobs.filter((j) => j.url).length;
+      const progress = Math.min(completedCount * 33, 99);
       return NextResponse.json({
-        data: { status: "failed", progress: null, result: null, error: result.error },
+        data: { status: "processing", progress, result: null, error: null },
       });
     }
 
-    // processing
+    // Single-clip or unknown — cron is handling it
     return NextResponse.json({
-      data: { status: "processing", progress: result.progress, result: null, error: null },
+      data: { status: "processing", progress: 30, result: null, error: null },
     });
   } catch (error) {
     return handleApiError(error);
