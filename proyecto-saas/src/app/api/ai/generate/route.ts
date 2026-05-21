@@ -110,28 +110,32 @@ export async function POST(request: Request) {
       const kling = new KlingClient(klingKey);
       const ar = (aspectRatio ?? getAspectRatioForFormat(format, platform)) as "9:16" | "16:9" | "1:1";
       const validImageUrls = (referenceImageUrls as string[] | undefined)?.filter(Boolean) ?? [];
-      const firstImage = validImageUrls[0] ?? (referenceImageUrl as string | undefined);
+      // Each clip gets its own scene image for visual variety
+      const sceneImages = [
+        validImageUrls[0] ?? (referenceImageUrl as string | undefined),
+        validImageUrls[1],
+        validImageUrls[2],
+      ];
 
-      const clip1 = await kling.generateVideo({
-        prompt: promptText,
-        aspectRatio: ar,
-        duration: 10,
-        sound: false,
-        referenceImageUrl: firstImage,
-      });
+      // Start all 3 clips simultaneously — ~3× faster than sequential
+      const [clip1, clip2, clip3] = await Promise.all([
+        kling.generateVideo({ prompt: promptText, aspectRatio: ar, duration: 10, sound: false, referenceImageUrl: sceneImages[0] }),
+        kling.generateVideo({ prompt: promptText, aspectRatio: ar, duration: 10, sound: false, referenceImageUrl: sceneImages[1] }),
+        kling.generateVideo({ prompt: promptText, aspectRatio: ar, duration: 10, sound: false, referenceImageUrl: sceneImages[2] }),
+      ]);
 
       primaryJobId = clip1.jobId;
       primaryProvider = "kling";
       platformData = {
         jobType: "video",
         multi_clip: true,
+        multi_clip_parallel: true,
         prompt: promptText,
         aspect_ratio: ar,
-        referenceImageUrl: firstImage,
         clip_jobs: [
           { scene: 1, jobId: clip1.jobId, url: null },
-          { scene: 2, jobId: null, url: null },
-          { scene: 3, jobId: null, url: null },
+          { scene: 2, jobId: clip2.jobId, url: null },
+          { scene: 3, jobId: clip3.jobId, url: null },
         ],
         ...(voiceUrl ? { voice_url: voiceUrl } : {}),
       };

@@ -32,9 +32,116 @@ export async function processKlingJob(
 ): Promise<VideoProcessResult> {
   const isMultiClip = post.platform_data?.multi_clip === true;
   if (isMultiClip) {
+    if (post.platform_data?.multi_clip_parallel) {
+      return runParallelMultiClipStep(post, klingKey, workspaceId, admin);
+    }
     return runMultiClipStep(post, klingKey, workspaceId, admin);
   }
   return runSingleClipStep(post, klingKey, workspaceId, admin, nanoBananaKey);
+}
+
+// ── Parallel multi-clip (3 × 10s started simultaneously → concat when all done) ─
+
+async function runParallelMultiClipStep(
+  post: GeneratedPostRow,
+  klingKey: string,
+  workspaceId: string,
+  admin: SupabaseClient,
+): Promise<VideoProcessResult> {
+  const kling = new KlingClient(klingKey);
+  const clipJobs = (post.platform_data?.clip_jobs ?? []) as ClipJob[];
+
+  const log = (msg: string) => console.log(`[ParallelClips] post=${post.id} ${msg}`);
+
+  // Poll all clips that have a jobId but no URL yet
+  for (const clip of clipJobs.filter((j) => j.jobId && !j.url)) {
+    let status;
+    try {
+      status = await kling.getJobStatus(clip.jobId!);
+    } catch (err) {
+      log(`clip ${clip.scene} status error: ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
+
+    log(`clip ${clip.scene} → ${status.status}${status.videoUrl ? " (got url)" : ""}`);
+
+    if (status.status === "failed") {
+      const errMsg = status.error ?? `Clip ${clip.scene} falló en Kling`;
+      await admin.from("generated_posts").update({
+        platform_data: { ...post.platform_data, clip_jobs: clipJobs, job_failed: true, job_error: errMsg },
+      }).eq("id", post.id);
+      return { status: "failed", error: errMsg };
+    }
+
+    if (status.status === "completed" && status.videoUrl) {
+      clip.url = status.videoUrl;
+    }
+  }
+
+  // Persist updated clip_jobs
+  await admin.from("generated_posts").update({
+    platform_data: { ...post.platform_data, clip_jobs: clipJobs },
+  }).eq("id", post.id);
+
+  const completedCount = clipJobs.filter((j) => j.url).length;
+  if (completedCount < clipJobs.length) {
+    log(`${completedCount}/${clipJobs.length} clips listos, esperando…`);
+    return { status: "processing", progress: completedCount * 33 };
+  }
+
+  // ── All clips done → FFmpeg concat ──────────────────────────────────────────
+  log("Todos los clips listos, concatenando…");
+  const allUrls = clipJobs.map((j) => j.url!);
+
+  let finalBuffer: Buffer;
+  try {
+    finalBuffer = await concatVideoClips({ videoUrls: allUrls });
+    log(`concat OK — ${(finalBuffer.byteLength / 1024 / 1024).toFixed(1)} MB`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`concat falló: ${msg}`);
+    await admin.from("generated_posts").update({
+      platform_data: { ...post.platform_data, clip_jobs: clipJobs, job_failed: true, job_error: `FFmpeg: ${msg}` },
+    }).eq("id", post.id);
+    return { status: "failed", error: `FFmpeg concat: ${msg}` };
+  }
+
+  // Optional voice merge
+  const voiceUrl = post.platform_data?.voice_url as string | undefined;
+  if (voiceUrl) {
+    try {
+      const res = await fetch(voiceUrl);
+      if (res.ok) {
+        const audioBuffer = Buffer.from(await res.arrayBuffer());
+        finalBuffer = await mergeAudioVideo({ videoUrl: "", audioBuffer, videoBuffer: finalBuffer });
+        log("voice merge OK");
+      }
+    } catch (err) {
+      log(`voice merge falló (continuando sin voz): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  const finalPath = `${workspaceId}/videos/${post.id}-final.mp4`;
+  const { error: uploadErr } = await admin.storage
+    .from("workspace-media")
+    .upload(finalPath, finalBuffer, { contentType: "video/mp4", upsert: true });
+
+  if (uploadErr) {
+    await admin.from("generated_posts").update({
+      platform_data: { ...post.platform_data, clip_jobs: clipJobs, job_failed: true, job_error: "Error subiendo video" },
+    }).eq("id", post.id);
+    return { status: "failed", error: "Error subiendo video final a Storage" };
+  }
+
+  const { data: { publicUrl } } = admin.storage.from("workspace-media").getPublicUrl(finalPath);
+  log(`video final listo → ${publicUrl}`);
+
+  await admin.from("generated_posts").update({
+    media_urls: [publicUrl],
+    platform_data: { ...post.platform_data, clip_jobs: clipJobs },
+  }).eq("id", post.id);
+
+  return { status: "completed", mediaUrls: [publicUrl], caption: post.caption, hashtags: post.hashtags ?? [] };
 }
 
 // ── Multi-clip state machine (3 × 10s → 30s with continuity) ────────────────
