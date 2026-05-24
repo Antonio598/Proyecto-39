@@ -100,8 +100,9 @@ export async function POST(request: Request) {
     }
 
     // ── Multi-clip video: 3 × 10s = 30s with frame continuity ──────────────────
-    // Clip 1 starts from reference image. Clips 2-3 start from the last frame of
-    // the previous clip (extracted by video-processor when each clip completes).
+    // Only clip 1 is started here. The cron (instrumentation.ts → processVideoQueue)
+    // spawns clips 2 and 3 sequentially after each previous clip finishes, using
+    // the last extracted frame as the reference image for continuity.
     let primaryJobId: string;
     let primaryProvider: "kling" | "nano_banana";
     let platformData: Record<string, unknown>;
@@ -110,32 +111,27 @@ export async function POST(request: Request) {
       const kling = new KlingClient(klingKey);
       const ar = (aspectRatio ?? getAspectRatioForFormat(format, platform)) as "9:16" | "16:9" | "1:1";
       const validImageUrls = (referenceImageUrls as string[] | undefined)?.filter(Boolean) ?? [];
-      // Each clip gets its own scene image for visual variety
-      const sceneImages = [
-        validImageUrls[0] ?? (referenceImageUrl as string | undefined),
-        validImageUrls[1],
-        validImageUrls[2],
-      ];
+      const firstImage = validImageUrls[0] ?? (referenceImageUrl as string | undefined);
 
-      // Start all 3 clips simultaneously — ~3× faster than sequential
-      const [clip1, clip2, clip3] = await Promise.all([
-        kling.generateVideo({ prompt: promptText, aspectRatio: ar, duration: 10, sound: false, referenceImageUrl: sceneImages[0] }),
-        kling.generateVideo({ prompt: promptText, aspectRatio: ar, duration: 10, sound: false, referenceImageUrl: sceneImages[1] }),
-        kling.generateVideo({ prompt: promptText, aspectRatio: ar, duration: 10, sound: false, referenceImageUrl: sceneImages[2] }),
-      ]);
+      const clip1 = await kling.generateVideo({
+        prompt: promptText,
+        aspectRatio: ar,
+        duration: 10,
+        sound: false,
+        referenceImageUrl: firstImage,
+      });
 
       primaryJobId = clip1.jobId;
       primaryProvider = "kling";
       platformData = {
         jobType: "video",
         multi_clip: true,
-        multi_clip_parallel: true,
         prompt: promptText,
         aspect_ratio: ar,
         clip_jobs: [
           { scene: 1, jobId: clip1.jobId, url: null },
-          { scene: 2, jobId: clip2.jobId, url: null },
-          { scene: 3, jobId: clip3.jobId, url: null },
+          { scene: 2, jobId: null, url: null },
+          { scene: 3, jobId: null, url: null },
         ],
         ...(voiceUrl ? { voice_url: voiceUrl } : {}),
       };

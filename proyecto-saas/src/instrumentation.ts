@@ -1,5 +1,6 @@
 // Internal scheduler — runs once when the Next.js server boots (Docker/Easypanel).
-// Uses only setInterval (no external deps) so webpack can bundle it without issues.
+// process-videos is called DIRECTLY (no HTTP) so it works in any Docker network config.
+// Other cron routes (publish, automation) still use HTTP as they have shorter timeouts.
 
 export async function register() {
   // Only run in the Node.js server process (not Edge runtime)
@@ -26,19 +27,25 @@ export async function register() {
       })
       .catch((e: unknown) => console.error(`[Cron] ${path} fetch error:`, e));
 
+  // Direct call avoids HTTP self-requests that fail in Docker (localhost:3000 unreachable)
+  const runVideoQueue = () =>
+    import("@/lib/ai/video-queue")
+      .then(({ processVideoQueue }) => processVideoQueue())
+      .catch((e: unknown) => console.error("[Cron] processVideoQueue error:", e));
+
   console.log(`[Cron] ✅ Scheduler starting — baseUrl=${baseUrl}`);
 
   // Run immediately on boot to pick up jobs that got stuck during a restart
   setTimeout(() => {
     console.log("[Cron] Boot run: publish + process-videos");
     call("/api/cron/publish");
-    call("/api/cron/process-videos");
+    runVideoQueue();
   }, 10_000); // 10s after boot so the server is fully ready
 
   // Every minute: publish scheduled posts + advance pending video jobs
   setInterval(() => {
     call("/api/cron/publish");
-    call("/api/cron/process-videos");
+    runVideoQueue();
   }, 60_000);
 
   // Every 15 minutes: automation content rules
@@ -57,5 +64,5 @@ export async function register() {
     if (d === 0 && h === 3 && m < 5) call("/api/cron/refresh-tokens");
   }, 60 * 60_000);
 
-  console.log("[Cron] ✅ Scheduler active — publish, process-videos, automation, metrics, tokens");
+  console.log("[Cron] ✅ Scheduler active — publish, process-videos (direct), automation, metrics, tokens");
 }

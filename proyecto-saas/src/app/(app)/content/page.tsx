@@ -336,6 +336,19 @@ export default function ContentPage() {
                             {format(parseISO(post.created_at), "d MMM · HH:mm", { locale: es })}
                           </span>
                         </div>
+                        {/* Show each completed clip so the user can verify progress */}
+                        {(post.platform_data?.clip_jobs?.filter(j => !!j.url) ?? []).map(clip => (
+                          <div key={clip.scene}>
+                            <p className="text-xs text-amber-700 font-medium mb-1">Clip {clip.scene} listo</p>
+                            <video
+                              src={clip.url!}
+                              controls
+                              muted
+                              className="w-full rounded-lg"
+                              style={{ maxHeight: 120 }}
+                            />
+                          </div>
+                        ))}
                       </div>
                     </div>
                   );
