@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import {
   ImageIcon, Video, Music, FileText, Upload, Trash2, Search,
-  Sparkles, Download, Calendar, Copy,
+  Sparkles, Download, Calendar, Copy, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "sonner";
@@ -36,8 +36,21 @@ interface GeneratedPost {
   media_urls: string[];
   format: string;
   ai_provider: string;
+  ai_job_id: string | null;
   created_at: string;
-  platform_data: { platform?: string } | null;
+  platform_data: {
+    platform?: string;
+    multi_clip?: boolean;
+    clip_jobs?: { scene: number; jobId: string | null; url: string | null }[];
+    job_failed?: boolean;
+  } | null;
+}
+
+function clipProgress(post: GeneratedPost): number {
+  const jobs = post.platform_data?.clip_jobs;
+  if (!jobs) return 10;
+  const done = jobs.filter((j) => !!j.url).length;
+  return Math.max(10, done * 33);
 }
 
 async function fetchAssets(workspaceId: string, type?: string) {
@@ -81,6 +94,11 @@ export default function ContentPage() {
     queryKey: ["generated-posts", activeWorkspaceId],
     queryFn: () => fetchGeneratedPosts(activeWorkspaceId!),
     enabled: !!activeWorkspaceId && tab === "generated",
+    refetchInterval: (query) => {
+      const posts = query.state.data as GeneratedPost[] | undefined;
+      const hasInProgress = (posts ?? []).some((p) => !p.media_urls?.length && !!p.ai_job_id);
+      return hasInProgress ? 20_000 : false;
+    },
   });
 
   const filteredGenerated = generatedPosts.filter((p) =>
@@ -296,6 +314,33 @@ export default function ContentPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredGenerated.map((post) => {
+                // In-progress job — show progress card instead of thumbnail
+                if (!post.media_urls?.length) {
+                  const pct = clipProgress(post);
+                  return (
+                    <div key={post.id} className="bg-white rounded-xl border overflow-hidden">
+                      <div className="flex items-center justify-center bg-amber-50 border-b" style={{ aspectRatio: "16/9", maxHeight: 180 }}>
+                        <div className="text-center p-4">
+                          <Loader2 className="w-8 h-8 text-amber-500 animate-spin mx-auto mb-2" />
+                          <p className="text-sm font-medium text-amber-800">Procesando video...</p>
+                          <p className="text-xs text-amber-600 mt-1">El cron lo completa en segundo plano</p>
+                        </div>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        <div className="w-full bg-muted rounded-full h-1.5">
+                          <div className="bg-amber-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-amber-600 font-medium">{pct}% completado</span>
+                          <span className="text-xs text-muted-foreground">
+                            {format(parseISO(post.created_at), "d MMM · HH:mm", { locale: es })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 const mediaUrl = post.media_urls[0];
                 const isVid = isVideo(mediaUrl);
                 return (
