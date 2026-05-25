@@ -99,10 +99,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── Multi-clip video: 3 × 10s = 30s with frame continuity ──────────────────
-    // Only clip 1 is started here. The cron (instrumentation.ts → processVideoQueue)
-    // spawns clips 2 and 3 sequentially after each previous clip finishes, using
-    // the last extracted frame as the reference image for continuity.
     let primaryJobId: string;
     let primaryProvider: "kling" | "nano_banana";
     let platformData: Record<string, unknown>;
@@ -113,26 +109,19 @@ export async function POST(request: Request) {
       const validImageUrls = (referenceImageUrls as string[] | undefined)?.filter(Boolean) ?? [];
       const firstImage = validImageUrls[0] ?? (referenceImageUrl as string | undefined);
 
-      const clip1 = await kling.generateVideo({
+      const job = await kling.generateVideo({
         prompt: promptText,
         aspectRatio: ar,
-        duration: 10,
+        duration: 8,
         sound: false,
         referenceImageUrl: firstImage,
       });
 
-      primaryJobId = clip1.jobId;
+      primaryJobId = job.jobId;
       primaryProvider = "kling";
       platformData = {
         jobType: "video",
-        multi_clip: true,
-        prompt: promptText,
-        aspect_ratio: ar,
-        clip_jobs: [
-          { scene: 1, jobId: clip1.jobId, url: null },
-          { scene: 2, jobId: null, url: null },
-          { scene: 3, jobId: null, url: null },
-        ],
+        referenceImageUrl: firstImage,
         ...(voiceUrl ? { voice_url: voiceUrl } : {}),
       };
     } else {
