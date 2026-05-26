@@ -108,8 +108,12 @@ export class KlingClient {
     const data = (raw.data ?? raw) as Record<string, unknown>;
     const rawStatus = ((data.status as string) ?? "").toUpperCase();
 
-    // Per docs: data.response is an array of video URLs
-    const responseArr = data.response as string[] | undefined;
+    // Per docs: data.response might be an array, or an object with resultUrls
+    const responseData = data.response as string[] | { resultUrls?: string[] } | undefined;
+    const responseArr = Array.isArray(responseData)
+      ? responseData
+      : (responseData?.resultUrls as string[] | undefined);
+
     const videoUrl: string | undefined =
       Array.isArray(responseArr) && responseArr.length > 0
         ? responseArr[0]

@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       const job = await kling.generateVideo({
         prompt: promptText,
         aspectRatio: ar,
-        duration: 8,
+        duration: 5,
         sound: false,
         referenceImageUrl: firstImage,
       });
