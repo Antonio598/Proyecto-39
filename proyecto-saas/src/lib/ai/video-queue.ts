@@ -9,16 +9,17 @@ export async function processVideoQueue(): Promise<void> {
     .select("id, workspace_id, ai_provider, ai_job_id, media_urls, caption, hashtags, platform_data")
     .in("ai_provider", ["kling", "nano_banana"])
     .not("ai_job_id", "is", null)
-    .or("media_urls.is.null,media_urls.eq.{}")
     .gte("created_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-    .limit(5);
+    .limit(50);
 
   if (error) {
     console.error("[VideoQueue] query error:", error);
     return;
   }
 
-  for (const post of posts ?? []) {
+  const pendingPosts = posts?.filter((p) => !p.media_urls || p.media_urls.length === 0) ?? [];
+
+  for (const post of pendingPosts) {
     if ((post.platform_data as Record<string, unknown> | null)?.job_failed) continue;
 
     try {
