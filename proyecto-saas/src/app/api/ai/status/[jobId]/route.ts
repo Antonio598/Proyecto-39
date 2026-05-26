@@ -2,12 +2,10 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAccess } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/utils/errors";
+import { processKlingJob, type GeneratedPostRow } from "@/lib/ai/video-processor";
 
 export const maxDuration = 30;
 
-// Read-only status endpoint — the cron job (/api/cron/process-videos) does all
-// the actual processing. This endpoint just reads DB state so the browser can
-// poll without racing against the background worker.
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ jobId: string }> }
@@ -19,7 +17,7 @@ export async function GET(
 
     const { data: post } = await admin
       .from("generated_posts")
-      .select("id, caption, hashtags, media_urls, platform_data")
+      .select("id, workspace_id, ai_provider, ai_job_id, caption, hashtags, media_urls, platform_data")
       .eq("workspace_id", workspaceId)
       .eq("ai_job_id", jobId)
       .single();
@@ -47,7 +45,7 @@ export async function GET(
 
     const pd = post.platform_data as Record<string, unknown> | null;
 
-    // Permanently failed — marked by background processor so cron stops retrying
+    // Permanently failed
     if (pd?.job_failed) {
       return NextResponse.json({
         data: {
@@ -59,7 +57,7 @@ export async function GET(
       });
     }
 
-    // Multi-clip: derive progress from clip_jobs array in platform_data
+    // Multi-clip: read-only — cron handles the FFmpeg concat step
     if (pd?.multi_clip) {
       const clipJobs = (pd.clip_jobs ?? []) as Array<{ scene: number; jobId: string | null; url: string | null }>;
       const completedCount = clipJobs.filter((j) => j.url).length;
@@ -69,7 +67,58 @@ export async function GET(
       });
     }
 
-    // Single-clip or unknown — cron is handling it
+    // Single-clip: poll Kling now so the job advances while the user is on the page.
+    // The cron (127.0.0.1:3000) handles it when the user is away.
+    // Race condition is safe: both paths do the same idempotent DB write.
+    const { data: brand } = await admin
+      .from("brand_settings")
+      .select("kling_key, nano_banana_key")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+
+    await processKlingJob(
+      post as unknown as GeneratedPostRow,
+      brand?.kling_key ?? "",
+      workspaceId,
+      admin,
+      brand?.nano_banana_key ?? undefined,
+    ).catch(() => {});
+
+    // Re-read to pick up any state the poll just wrote
+    const { data: fresh } = await admin
+      .from("generated_posts")
+      .select("caption, hashtags, media_urls, platform_data, id")
+      .eq("ai_job_id", jobId)
+      .single();
+
+    if (fresh && fresh.media_urls?.length > 0) {
+      return NextResponse.json({
+        data: {
+          status: "completed",
+          progress: 100,
+          result: {
+            caption: fresh.caption,
+            hashtags: fresh.hashtags,
+            mediaUrls: fresh.media_urls,
+            postId: fresh.id,
+          },
+          error: null,
+        },
+      });
+    }
+
+    const freshPd = (fresh?.platform_data ?? null) as Record<string, unknown> | null;
+    if (freshPd?.job_failed) {
+      return NextResponse.json({
+        data: {
+          status: "failed",
+          progress: null,
+          result: null,
+          error: (freshPd.job_error as string | undefined) ?? "El video falló",
+        },
+      });
+    }
+
     return NextResponse.json({
       data: { status: "processing", progress: 30, result: null, error: null },
     });

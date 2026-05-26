@@ -6,7 +6,9 @@ export async function register() {
   // Only run in the Node.js server process (not Edge runtime)
   if (process.env.NEXT_RUNTIME === "edge") return;
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  // Use loopback — guaranteed to reach the Next.js process inside the same container.
+  // Avoids hairpin NAT issues when NEXT_PUBLIC_APP_URL goes through Traefik/EasyPanel.
+  const baseUrl = "http://127.0.0.1:3000";
   const secret = process.env.CRON_SECRET;
 
   if (!secret) {
