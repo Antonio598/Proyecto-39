@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -116,19 +115,15 @@ export default function ContentPage() {
       let success = 0;
       for (const file of acceptedFiles) {
         try {
+          const fd = new FormData();
+          fd.append("file", file);
           const res = await fetch("/api/content/upload", {
             method: "POST",
-            headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
-            body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileSize: file.size }),
+            headers: { "x-workspace-id": activeWorkspaceId },
+            body: fd,
           });
           const json = await res.json();
           if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`);
-          const { data } = json;
-          const supabase = createClient();
-          const { error: uploadError } = await supabase.storage
-            .from("workspace-media")
-            .uploadToSignedUrl(data.path, data.token, file, { contentType: file.type });
-          if (uploadError) throw uploadError;
           success++;
         } catch (error) {
           console.error("Upload error:", error);
