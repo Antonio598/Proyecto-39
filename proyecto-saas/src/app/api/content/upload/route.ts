@@ -28,6 +28,9 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // Create bucket if it doesn't exist yet (first-time setup)
+    await supabase.storage.createBucket(BUCKETS.MEDIA, { public: true }).catch(() => {});
+
     const { error: storageError } = await supabase.storage
       .from(BUCKETS.MEDIA)
       .upload(path, buffer, { contentType: file.type, upsert: false });
