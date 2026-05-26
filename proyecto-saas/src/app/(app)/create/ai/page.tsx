@@ -680,55 +680,25 @@ export default function AiCreatePage() {
                   <p className="text-xs text-muted-foreground font-medium">
                     {selectedAsset ? "Imagen seleccionada del banco:" : "¿Usar imagen existente del banco multimedia?"}
                   </p>
-                  <button type="button" onClick={() => setShowAssetPicker((v) => !v)}
+                  <button type="button" onClick={() => setShowAssetPicker(true)}
                     className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
                     <Library className="w-3.5 h-3.5" />
-                    {showAssetPicker ? "Cerrar banco" : "Abrir banco"}
+                    {selectedAsset ? "Cambiar imagen" : "Elegir del banco"}
                   </button>
                 </div>
 
                 {selectedAsset && (
-                  <div className="flex items-center gap-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200 mb-2">
+                  <div className="flex items-center gap-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={selectedAsset.public_url} alt="" className="w-12 h-12 object-cover rounded-md flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold truncate">{selectedAsset.file_name}</p>
-                      <p className="text-xs text-indigo-600">Se usará esta imagen (no se generará una nueva)</p>
+                      <p className="text-xs text-indigo-600">Se usará esta imagen como referencia</p>
                     </div>
-                    <button type="button" onClick={() => { setSelectedAssetId(null); }}
-                      className="text-xs text-red-500 hover:text-red-700 font-medium">Quitar</button>
-                  </div>
-                )}
-
-                {showAssetPicker && (
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground border-b">
-                      Banco multimedia — fotos ({photoAssets.length})
-                    </div>
-                    <div className="p-3 max-h-52 overflow-y-auto">
-                      {photoAssets.length === 0 ? (
-                        <div className="text-center py-6">
-                          <p className="text-xs text-muted-foreground">No hay fotos en el banco.</p>
-                          <Link href="/content" className="text-xs text-indigo-600 hover:underline">
-                            Subir fotos →
-                          </Link>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-5 gap-2">
-                          {photoAssets.map((asset) => (
-                            <button key={asset.id} type="button"
-                              onClick={() => { setSelectedAssetId(asset.id); setShowAssetPicker(false); }}
-                              className={cn(
-                                "aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105",
-                                selectedAssetId === asset.id ? "border-indigo-500 shadow-md" : "border-transparent hover:border-indigo-300"
-                              )}>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={asset.public_url} alt="" className="w-full h-full object-cover" />
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <button type="button" onClick={() => setSelectedAssetId(null)}
+                      className="text-xs text-red-500 hover:text-red-700 font-medium flex-shrink-0">
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
               </div>
@@ -1059,8 +1029,94 @@ export default function AiCreatePage() {
           <div>
             <p className="text-sm font-medium text-indigo-800">Generando tu contenido...</p>
             <p className="text-xs text-indigo-600 mt-0.5">
-              Los videos de 3 clips tardan 20–45 min. No cierres esta ventana — el cron lo termina aunque la cierres.
+              El video tarda entre 10–15 min. No cierres esta ventana — el cron lo termina aunque la cierres.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ─── BANK IMAGE PICKER MODAL ──────────────────────────────────────── */}
+      {showAssetPicker && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowAssetPicker(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <div className="flex items-center gap-2">
+                <Library className="w-4 h-4 text-indigo-600" />
+                <h3 className="font-semibold text-sm">Banco multimedia — fotos ({photoAssets.length})</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAssetPicker(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Grid */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {photoAssets.length === 0 ? (
+                <div className="text-center py-12">
+                  <Library className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+                  <p className="text-sm font-medium">No hay fotos en el banco</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ve a{" "}
+                    <span className="text-indigo-600 font-medium">Contenido → Banco multimedia</span>
+                    {" "}para subir fotos
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {photoAssets.map((asset) => (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      onClick={() => { setSelectedAssetId(asset.id); setShowAssetPicker(false); }}
+                      className={cn(
+                        "group relative aspect-square rounded-xl overflow-hidden border-2 transition-all hover:scale-105",
+                        selectedAssetId === asset.id
+                          ? "border-indigo-500 shadow-lg ring-2 ring-indigo-200"
+                          : "border-transparent hover:border-indigo-300"
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={asset.public_url} alt={asset.file_name} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-xs font-medium bg-black/50 px-2 py-1 rounded-lg">Seleccionar</span>
+                      </div>
+                      {selectedAssetId === asset.id && (
+                        <div className="absolute top-2 right-2 w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center">
+                          <CheckCircle className="w-3.5 h-3.5 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {selectedAssetId && (
+              <div className="border-t px-5 py-3 flex items-center justify-between bg-indigo-50">
+                <p className="text-xs text-indigo-700 font-medium">
+                  Imagen seleccionada: {photoAssets.find(a => a.id === selectedAssetId)?.file_name}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowAssetPicker(false)}
+                  className="text-xs bg-indigo-600 text-white px-4 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Confirmar
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
