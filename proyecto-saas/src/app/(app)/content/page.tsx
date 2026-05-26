@@ -121,16 +121,19 @@ export default function ContentPage() {
             headers: { "Content-Type": "application/json", "x-workspace-id": activeWorkspaceId },
             body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileSize: file.size }),
           });
-          const { data } = await res.json();
+          const json = await res.json();
+          if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`);
+          const { data } = json;
           const supabase = createClient();
           const { error: uploadError } = await supabase.storage
             .from("workspace-media")
-            .uploadToSignedUrl(data.path, data.token, file);
+            .uploadToSignedUrl(data.path, data.token, file, { contentType: file.type });
           if (uploadError) throw uploadError;
           success++;
         } catch (error) {
           console.error("Upload error:", error);
-          toast.error(`Error al subir ${file.name}`);
+          const msg = error instanceof Error ? error.message : String(error);
+          toast.error(`Error al subir ${file.name}: ${msg}`);
         }
       }
       if (success > 0) {
