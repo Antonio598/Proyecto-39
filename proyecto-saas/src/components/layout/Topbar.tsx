@@ -11,8 +11,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Bell, Plus, LogOut, User, Settings } from "lucide-react";
+import { Bell, Plus, LogOut, User, Settings, Menu } from "lucide-react";
 import Link from "next/link";
+import { useUiStore } from "@/store/ui.store";
 import type { User as UserType } from "@/types/database";
 
 interface TopbarProps {
@@ -33,10 +34,20 @@ export function Topbar({ user }: TopbarProps) {
     ? user.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : user.email.slice(0, 2).toUpperCase();
 
+  const { setMobileMenuOpen } = useUiStore();
+
   return (
-    <header className="h-14 border-b bg-background flex items-center justify-between px-6 flex-shrink-0">
-      {/* Left — page will fill this via CSS */}
-      <div id="topbar-title" className="flex items-center gap-2 min-w-0" />
+    <header className="h-14 border-b bg-background flex items-center justify-between px-4 md:px-6 flex-shrink-0">
+      {/* Left — mobile menu toggle and title */}
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          onClick={() => setMobileMenuOpen(true)}
+          className="p-1.5 -ml-1.5 text-muted-foreground hover:bg-muted rounded-md md:hidden"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div id="topbar-title" className="flex items-center gap-2 min-w-0" />
+      </div>
 
       {/* Right actions */}
       <div className="flex items-center gap-2 ml-auto">

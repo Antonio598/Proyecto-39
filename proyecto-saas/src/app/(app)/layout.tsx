@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { MobileSidebar } from "@/components/layout/MobileSidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { WorkspaceProvider } from "@/providers/WorkspaceProvider";
 import { listUserWorkspaces } from "@/lib/supabase/queries/workspaces";
@@ -60,11 +61,18 @@ export default async function AppLayout({
       initialActiveId={activeWorkspaceId}
     >
       <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar pendingApprovals={pendingCount} />
+        {/* Desktop Sidebar */}
+        <div className="hidden md:flex h-full">
+          <Sidebar pendingApprovals={pendingCount} />
+        </div>
+        
+        {/* Mobile Sidebar Overlay */}
+        <MobileSidebar pendingApprovals={pendingCount} />
+
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Topbar user={appUser} />
           <main className="flex-1 overflow-y-auto">
-            <div className="p-6">{children}</div>
+            <div className="p-4 md:p-6">{children}</div>
           </main>
         </div>
       </div>

@@ -101,7 +101,7 @@ export default function WorkspaceSettingsPage() {
       {/* Danger zone */}
       <div className="bg-white rounded-xl border border-red-200 p-6 space-y-4">
         <h2 className="text-sm font-semibold text-red-700 uppercase tracking-wide">Zona de peligro</h2>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium">Eliminar workspace</p>
             <p className="text-xs text-muted-foreground mt-0.5">

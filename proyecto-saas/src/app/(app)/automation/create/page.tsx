@@ -234,7 +234,7 @@ export default function CreateRulePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">Tono de voz</label>
               <select value={aiTone} onChange={(e) => setAiTone(e.target.value)}
@@ -361,7 +361,7 @@ export default function CreateRulePage() {
         {/* ── Publish mode ── */}
         <div className="bg-white rounded-xl border p-5 space-y-3">
           <h3 className="font-semibold text-sm">Modo de publicación</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {[
               { id: "approval", title: "Con aprobación", desc: "Revisas cada post antes de publicar" },
               { id: "auto", title: "Automático", desc: "Se publica sin intervención manual" },

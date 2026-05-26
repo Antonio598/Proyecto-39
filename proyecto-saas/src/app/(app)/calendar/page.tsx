@@ -315,13 +315,14 @@ export default function CalendarPage() {
 
       {viewMode === "month" ? (
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <div className="bg-white rounded-xl border overflow-hidden">
-            <div className="grid grid-cols-7 border-b">
-              {DAY_NAMES.map((d) => (
-                <div key={d} className="py-2 text-center text-xs font-semibold text-muted-foreground border-r last:border-0">{d}</div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7">
+          <div className="bg-white rounded-xl border overflow-x-auto">
+            <div className="min-w-[700px]">
+              <div className="grid grid-cols-7 border-b">
+                {DAY_NAMES.map((d) => (
+                  <div key={d} className="py-2 text-center text-xs font-semibold text-muted-foreground border-r last:border-0">{d}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7">
               {paddedDays.map((day) => {
                 const dayPosts = getPostsForDay(day);
                 const isCurrentMonth = isSameMonth(day, currentDate);
@@ -364,6 +365,7 @@ export default function CalendarPage() {
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
           <DragOverlay>{activePost && <PostChip post={activePost} onClick={() => {}} />}</DragOverlay>
