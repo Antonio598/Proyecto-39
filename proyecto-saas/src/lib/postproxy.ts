@@ -92,7 +92,10 @@ export async function publishPost(params: {
 }) {
   const platformsExtra: Record<string, unknown> = {};
   if (params.platform === "facebook") {
-    const fbFormat = params.mediaType === "STORY" ? "story" : "post";
+    const fbFormat =
+      params.mediaType === "STORY" ? "story" :
+      params.mediaType === "REELS" ? "reel" :
+      "post";
     platformsExtra.facebook = {
       format: fbFormat,
       ...(params.pageId && { page_id: params.pageId }),
@@ -105,6 +108,8 @@ export async function publishPost(params: {
     platformsExtra.tiktok = { privacy_status: "PUBLIC_TO_EVERYONE" };
   }
 
+  const isVideoMedia = params.mediaUrls?.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u));
+
   const payload: Record<string, unknown> = {
     post: {
       body: params.body,
@@ -112,9 +117,11 @@ export async function publishPost(params: {
     },
     profiles: params.profiles,
     media_urls: params.mediaUrls,
-    media: params.mediaUrls,
-    video_url: params.mediaUrls?.[0], // just in case
-    image_urls: params.mediaUrls, // just in case
+    ...(isVideoMedia
+      ? { video_url: params.mediaUrls?.[0] }
+      : params.mediaUrls?.length
+        ? { image_urls: params.mediaUrls }
+        : {}),
     ...(Object.keys(platformsExtra).length > 0 && { platforms: platformsExtra }),
   };
 
