@@ -108,7 +108,11 @@ export async function publishPost(params: {
     platformsExtra.tiktok = { privacy_status: "PUBLIC_TO_EVERYONE" };
   }
 
-  const isVideoMedia = params.mediaUrls?.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u));
+  // Treat as video if mediaType is REELS, or if any URL has a video extension.
+  // Kling CDN URLs have no extension, so we can't rely on the URL alone for reels.
+  const isVideoMedia =
+    params.mediaType === "REELS" ||
+    params.mediaUrls?.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u));
 
   const payload: Record<string, unknown> = {
     post: {
