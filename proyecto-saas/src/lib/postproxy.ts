@@ -114,17 +114,28 @@ export async function publishPost(params: {
     params.mediaType === "REELS" ||
     params.mediaUrls?.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u));
 
+  // Add extension to URL for Postproxy/Ayrshare to detect it correctly as a video
+  let processedMediaUrls = params.mediaUrls;
+  if (isVideoMedia && processedMediaUrls && processedMediaUrls.length > 0) {
+    processedMediaUrls = processedMediaUrls.map((u) => {
+      if (!/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u)) {
+        return u.includes("?") ? `${u}&ext=.mp4` : `${u}?ext=.mp4`;
+      }
+      return u;
+    });
+  }
+
   const payload: Record<string, unknown> = {
     post: {
       body: params.body,
       ...(params.mediaType && { media_type: params.mediaType }),
     },
     profiles: params.profiles,
-    media_urls: params.mediaUrls,
+    media_urls: processedMediaUrls,
     ...(isVideoMedia
-      ? { video_url: params.mediaUrls?.[0] }
-      : params.mediaUrls?.length
-        ? { image_urls: params.mediaUrls }
+      ? { video_url: processedMediaUrls?.[0] }
+      : processedMediaUrls?.length
+        ? { image_urls: processedMediaUrls }
         : {}),
     ...(Object.keys(platformsExtra).length > 0 && { platforms: platformsExtra }),
   };
