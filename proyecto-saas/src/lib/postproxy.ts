@@ -97,10 +97,17 @@ export async function publishPost(params: {
     params.mediaType === "REELS" ? "reel" :
     "post";
 
+  let fbFormat = platformFormat;
+  // Facebook requires videos to be published as reels in many cases, or Postproxy expects it
+  if (isVideoMedia && fbFormat === "post") {
+    fbFormat = "reel";
+  }
+
   if (params.platform === "facebook") {
     platformsExtra.facebook = {
-      format: platformFormat,
+      format: fbFormat,
       ...(params.pageId && { page_id: params.pageId }),
+      ...(fbFormat === "reel" && params.body && { title: params.body.slice(0, 50) }),
     };
   } else if (params.platform === "instagram") {
     platformsExtra.instagram = {
@@ -121,16 +128,10 @@ export async function publishPost(params: {
     params.mediaType === "REELS" ||
     params.mediaUrls?.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u));
 
-  // Add extension to URL for Postproxy/Ayrshare to detect it correctly as a video
+  // Use the media URLs directly. Postproxy downloads them and checks Content-Type.
+  // Adding ?ext=.mp4 to signed URLs (like Supabase storage or Kling CDN) breaks their signatures (403 Forbidden),
+  // which causes Postproxy to fail to download the video, resulting in "Media is required" errors.
   let processedMediaUrls = params.mediaUrls;
-  if (isVideoMedia && processedMediaUrls && processedMediaUrls.length > 0) {
-    processedMediaUrls = processedMediaUrls.map((u) => {
-      if (!/\.(mp4|mov|webm|m4v)(\?|$)/i.test(u)) {
-        return u.includes("?") ? `${u}&ext=.mp4` : `${u}?ext=.mp4`;
-      }
-      return u;
-    });
-  }
 
   const payload: Record<string, unknown> = {
     post: {
