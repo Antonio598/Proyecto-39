@@ -125,6 +125,7 @@ export async function POST(
           status: "published",
           published_at: now.toISOString(),
           platform_post_id: platformPostId,
+          error_message: null,
           updated_at: now.toISOString(),
         })
         .eq("id", postId);
