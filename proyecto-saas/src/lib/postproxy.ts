@@ -131,7 +131,7 @@ export async function publishPost(params: {
   // Use the media URLs directly. Postproxy downloads them and checks Content-Type.
   // Adding ?ext=.mp4 to signed URLs (like Supabase storage or Kling CDN) breaks their signatures (403 Forbidden),
   // which causes Postproxy to fail to download the video, resulting in "Media is required" errors.
-  let processedMediaUrls = params.mediaUrls;
+  const processedMediaUrls = params.mediaUrls;
 
   const payload: Record<string, unknown> = {
     post: {
