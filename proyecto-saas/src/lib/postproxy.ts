@@ -91,16 +91,23 @@ export async function publishPost(params: {
   platform?: string;       // Platform name for platform-specific params
 }) {
   const platformsExtra: Record<string, unknown> = {};
+  
+  const platformFormat =
+    params.mediaType === "STORY" ? "story" :
+    params.mediaType === "REELS" ? "reel" :
+    "post";
+
   if (params.platform === "facebook") {
-    const fbFormat =
-      params.mediaType === "STORY" ? "story" :
-      params.mediaType === "REELS" ? "reel" :
-      "post";
     platformsExtra.facebook = {
-      format: fbFormat,
+      format: platformFormat,
       ...(params.pageId && { page_id: params.pageId }),
     };
+  } else if (params.platform === "instagram") {
+    platformsExtra.instagram = {
+      format: platformFormat,
+    };
   }
+
   if (params.platform === "youtube") {
     platformsExtra.youtube = { privacy_status: "public" };
   }
@@ -128,15 +135,9 @@ export async function publishPost(params: {
   const payload: Record<string, unknown> = {
     post: {
       body: params.body,
-      ...(params.mediaType && { media_type: params.mediaType }),
     },
     profiles: params.profiles,
-    media_urls: processedMediaUrls,
-    ...(isVideoMedia
-      ? { video_url: processedMediaUrls?.[0] }
-      : processedMediaUrls?.length
-        ? { image_urls: processedMediaUrls }
-        : {}),
+    ...(processedMediaUrls && processedMediaUrls.length > 0 ? { media: processedMediaUrls } : {}),
     ...(Object.keys(platformsExtra).length > 0 && { platforms: platformsExtra }),
   };
 
