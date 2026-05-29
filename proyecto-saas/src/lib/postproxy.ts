@@ -97,6 +97,11 @@ export async function publishPost(params: {
     params.mediaType === "REELS" ? "reel" :
     "post";
 
+  // Treat as video if mediaType is REELS, or if any URL has a video extension.
+  const isVideoMedia =
+    params.mediaType === "REELS" ||
+    params.mediaUrls?.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u));
+
   let fbFormat = platformFormat;
   // Facebook requires videos to be published as reels in many cases, or Postproxy expects it
   if (isVideoMedia && fbFormat === "post") {
@@ -113,20 +118,16 @@ export async function publishPost(params: {
     platformsExtra.instagram = {
       format: platformFormat,
     };
+  } else if (params.platform === "tiktok") {
+    platformsExtra.tiktok = {
+      privacy_status: "public",
+    };
+  } else if (params.platform === "youtube") {
+    platformsExtra.youtube = {
+      title: params.body ? params.body.slice(0, 70) : "Short",
+      privacy_status: "public",
+    };
   }
-
-  if (params.platform === "youtube") {
-    platformsExtra.youtube = { privacy_status: "public" };
-  }
-  if (params.platform === "tiktok") {
-    platformsExtra.tiktok = { privacy_status: "PUBLIC_TO_EVERYONE" };
-  }
-
-  // Treat as video if mediaType is REELS, or if any URL has a video extension.
-  // Kling CDN URLs have no extension, so we can't rely on the URL alone for reels.
-  const isVideoMedia =
-    params.mediaType === "REELS" ||
-    params.mediaUrls?.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u));
 
   // Use the media URLs directly. Postproxy downloads them and checks Content-Type.
   // Adding ?ext=.mp4 to signed URLs (like Supabase storage or Kling CDN) breaks their signatures (403 Forbidden),
