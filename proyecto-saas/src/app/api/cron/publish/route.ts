@@ -75,9 +75,10 @@ export async function GET(request: Request) {
         }
 
         const isVid = mediaUrl ? /\.(mp4|mov|webm|m4v)(\?|$)/i.test(mediaUrl) : false;
+        const isVideoFormat = ["reel", "short", "long_video"].includes(content?.format ?? "");
 
         let mediaType: "REELS" | "STORY" | "FEED" = "FEED";
-        if (content?.format === "reel" || (account.platform === "youtube" && isVid)) mediaType = "REELS";
+        if (isVideoFormat || (account.platform === "youtube" && isVid)) mediaType = "REELS";
         else if (content?.format === "story") mediaType = "STORY";
 
         // Resolve Facebook page_id from post platform_data or account metadata

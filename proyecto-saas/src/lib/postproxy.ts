@@ -120,7 +120,10 @@ export async function publishPost(params: {
     };
   } else if (params.platform === "tiktok") {
     platformsExtra.tiktok = {
-      privacy_status: "public",
+      privacy_status: "PUBLIC_TO_EVERYONE",
+      allow_comment: true,
+      allow_duet: true,
+      allow_stitch: true,
     };
   } else if (params.platform === "youtube") {
     platformsExtra.youtube = {
