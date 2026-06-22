@@ -50,7 +50,6 @@ export class OpenAIClient {
 
     const platformName = PLATFORM_NAMES[req.platform] ?? req.platform;
     const formatName = FORMAT_NAMES[req.format] ?? req.format;
-    const isVideo = ["reel", "short", "long_video"].includes(req.format);
     const aspectRatio = req.format === "long_video" ? "16:9 horizontal, widescreen" : "9:16 vertical, mobile-first";
 
     const systemPrompt = `Eres un experto dual: director creativo de contenido para redes sociales Y especialista en prompt engineering para generadores de imagen y video con IA (Kling AI para videos, FLUX/Nano Banana para imágenes).

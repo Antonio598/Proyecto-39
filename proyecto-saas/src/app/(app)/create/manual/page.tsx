@@ -391,7 +391,7 @@ export default function ManualCreatePage() {
 
         {format === "text" && (
           <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
-            El formato "Texto" no requiere archivo multimedia.
+            El formato &quot;Texto&quot; no requiere archivo multimedia.
           </p>
         )}
       </div>
