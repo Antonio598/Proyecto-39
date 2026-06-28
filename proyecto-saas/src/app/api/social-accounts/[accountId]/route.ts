@@ -15,13 +15,24 @@ export async function DELETE(
     const { accountId } = await params;
     const admin = createAdminClient();
 
-    // Delete related scheduled_posts first to avoid FK constraint violation
-    const { error: postsError } = await admin
-      .from("scheduled_posts")
-      .delete()
-      .eq("social_account_id", accountId);
+    // Get the account to find the Postproxy profile ID
+    const { data: account } = await admin
+      .from("social_accounts")
+      .select("metadata")
+      .eq("id", accountId)
+      .single();
 
-    if (postsError) throw postsError;
+    // Delete profile from Postproxy so it doesn't reappear on next sync
+    const postproxyProfileId = (account?.metadata as Record<string, string> | null)?.postproxy_profile_id;
+    if (postproxyProfileId && process.env.POSTPROXY_API_KEY) {
+      await fetch(`https://api.postproxy.dev/api/profiles/${postproxyProfileId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${process.env.POSTPROXY_API_KEY}` },
+      }).catch(() => {}); // non-fatal: local delete proceeds regardless
+    }
+
+    // Delete related scheduled_posts first to avoid FK constraint violation
+    await admin.from("scheduled_posts").delete().eq("social_account_id", accountId);
 
     const { error } = await admin
       .from("social_accounts")
