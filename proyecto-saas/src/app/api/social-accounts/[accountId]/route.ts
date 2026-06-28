@@ -15,6 +15,14 @@ export async function DELETE(
     const { accountId } = await params;
     const admin = createAdminClient();
 
+    // Delete related scheduled_posts first to avoid FK constraint violation
+    const { error: postsError } = await admin
+      .from("scheduled_posts")
+      .delete()
+      .eq("social_account_id", accountId);
+
+    if (postsError) throw postsError;
+
     const { error } = await admin
       .from("social_accounts")
       .delete()
