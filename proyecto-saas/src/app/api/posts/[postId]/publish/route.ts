@@ -79,7 +79,7 @@ export async function POST(
         }
 
         let mediaType: "REELS" | "STORY" | "FEED" = "FEED";
-        if (content?.format === "reel") mediaType = "REELS";
+        if (content?.format === "reel" || content?.format === "short") mediaType = "REELS";
         else if (content?.format === "story") mediaType = "STORY";
 
         // Resolve Facebook page_id: from post's platform_data, or fall back to

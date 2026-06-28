@@ -95,7 +95,7 @@ export async function publishPost(params: {
   const platformFormat =
     params.mediaType === "STORY" ? "story" :
     params.mediaType === "REELS" ? "reel" :
-    "post";
+    "feed";
 
   // Treat as video if mediaType is REELS, or if any URL has a video extension.
   const isVideoMedia =
@@ -104,7 +104,7 @@ export async function publishPost(params: {
 
   let fbFormat = platformFormat;
   // Facebook requires videos to be published as reels in many cases, or Postproxy expects it
-  if (isVideoMedia && fbFormat === "post") {
+  if (isVideoMedia && (fbFormat === "post" || fbFormat === "feed")) {
     fbFormat = "reel";
   }
 
